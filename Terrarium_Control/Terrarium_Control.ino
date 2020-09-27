@@ -12,7 +12,7 @@
 #define topFanPin 0                     //Fan to remove condensation in the front glass
 #define pumpPin 16
 #define roPin 14                        //Reverse Osmosis relay
-#define fullROpin 12                     //internal fan that goes along with fogger
+#define fullROpin 16                     //internal fan that goes along with fogger
 //#define ledPin 13
 // *************************************************************************************************************************
 /*
@@ -39,8 +39,8 @@ String light2On = "08:10";
 String light2Off = "23:00";
 String nightLightOn = "21:00";
 String nightLightOff = "23:45";
-uint8_t pumpFreq = 180;         //Pump frequency in minutes     
-uint8_t pumpTime = 10;          //Number of seconds to run the pump  
+uint8_t pumpFreq = 180;         //Pump frequency in minutes
+uint8_t pumpTime = 10;          //Number of seconds to run the pump
 // ****************  recurring events ****************
 Metro pumpMetro ;         //
 //Metro fogMetro ;
@@ -55,12 +55,12 @@ int topFanState = LOW;            //Top ventilation fan
 // Rename those to relayX
 int light1RelayState = LOW;
 int light2RelayState = LOW;
-int nightLightRelayState=LOW;
+int nightLightRelayState = LOW;
 int roRelayState = LOW;
 uint8_t manfillTime = 11;   //Nuber of minutes to manually fill RO bottles
 bool fillingRO = false;
 bool manualFillRO = false;
-
+uint8_t fullRO;                //Level of RO supply
 
 void setup() {
   Serial.begin(115200);
@@ -73,19 +73,19 @@ void setup() {
   pinMode(topFanPin, OUTPUT);
   pinMode(pumpPin, OUTPUT);
   pinMode(roPin, OUTPUT);
-  pinmode(fullROpin,INPUT_PULLUP);
+  pinMode(fullROpin, INPUT_PULLUP);
 
-  digitalWrite(light1Pin,LOW);
-  digitalWrite(light2Pin,LOW);
-  digitalWrite(nightLightPin,LOW);
-  digitalWrite(topFanPin,LOW);
-  digitalWrite(pumpPin,LOW);
-  digitalWrite(roPin,LOW);
+  digitalWrite(light1Pin, LOW);
+  digitalWrite(light2Pin, LOW);
+  digitalWrite(nightLightPin, LOW);
+  digitalWrite(topFanPin, LOW);
+  digitalWrite(pumpPin, LOW);
+  digitalWrite(roPin, LOW);
   //************************ Set recurring events  ********************
   pumpMetro.interval(hoursToMillis(20));        //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
   topFanMetro.interval(hoursToMillis(20));      //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
   checkCurTime.interval(secondsToMillis(45));   //Check current time for any sceduled events
-  
+
 
   Serial.println("Connecting to ");
   Serial.println(ssid);
@@ -122,17 +122,17 @@ void startup() {
   // This sub is called once during setup, to initialize anything based on the schedule after power up
   Serial.println("Initializing after power On");
   /*
-  Serial.print("CDA Hour:");
-  Serial.print(cda.hour());
-  Serial.print("CDA Minute:");
-  Serial.print(cda.minute());
-  Serial.print("     ");
-  Serial.print("Light1Hour:");
-  Serial.print(light1On.substring(0, 2));
-  Serial.print("   ");
-  Serial.print("Light1 Minute:");
-  Serial.println(light1On.substring(3, 5));
-*/
+    Serial.print("CDA Hour:");
+    Serial.print(cda.hour());
+    Serial.print("CDA Minute:");
+    Serial.print(cda.minute());
+    Serial.print("     ");
+    Serial.print("Light1Hour:");
+    Serial.print(light1On.substring(0, 2));
+    Serial.print("   ");
+    Serial.print("Light1 Minute:");
+    Serial.println(light1On.substring(3, 5));
+  */
   if (cda.hour() >= light1On.substring(0, 2).toInt() && cda.hour() < light1Off.substring(0, 2).toInt()) {
 
     Serial.println("Turning Light1 On");
@@ -149,8 +149,7 @@ void startup() {
 
 
   }
-  Serial.print("Night lite time ? :");
-  Serial.println(cda.hour() >= nightLightOn.substring(0, 2).toInt() && cda.hour() < nightLightOff.substring(0, 2).toInt());
+ 
   if ((cda.hour() >= nightLightOn.substring(0, 2).toInt()) && (cda.hour() <= nightLightOff.substring(0, 2).toInt())) {
 
     Serial.println("Turning Night Light On");
@@ -162,10 +161,9 @@ void startup() {
     //Nothing for now
 
   }
- 
+
 
 }
-
 
 void loop() {
 
@@ -188,28 +186,10 @@ void loop() {
     fogger();
     }
   */
-checkhttpclient();
-checkRO();
+  checkhttpclient();
+  checkRO();
 }
-/*
-  void fogger() {
-    if (fogState == HIGH) {
-      fogState = LOW;
-      Serial.println("Fogging");
-      fogMetro.interval(minutesToMillis(15));
-      PulseFan();
-    }
-    else {
-      fogState = HIGH;
-      Serial.println("Stopping fogger");
-      fogMetro.interval(hoursToMillis(1));
-      analogWrite(fanPin,0);
 
-    }
-    //digitalWrite(fogPin,fogState);
-    //digitalWrite(fanPin,fogState);
-  }
-*/
 void pump() {
   if (pumpState == LOW) {
     pumpState = HIGH;
@@ -246,51 +226,20 @@ void checkRO() {
 
 
 void manual_Fill(uint8_t T) {
-  
-    if (fillingRO == false)
-    {
-      Serial.println("Not filling Automatically");
-     
-        {
-          manualFillMetro.interval(minutesToMillis(T);
-          digitalWrite(roPin, LOW);
-          manualFillRO = true;
-        }
-      }
-      else if ((manualFillRO == true) && (btnState == HIGH))
-      {
-        btnUp = millis();
-        //Number of seconds button was kept pressed
-        int secs = ((btnUp - btnDwn) / 1000);
-        if (secs > 3 )
-        {
-          digitalWrite(ROrelayPin, HIGH);
-          manualFillRO = false;
-        }
-      }
-    }
-    else
-    {
-      Serial.println("Already filling Automatically");
-      if (btnState == LOW)
-      {
-        Serial.println("Button down");
-        btnDwn = millis();
-      }
-      else
-      {
-        btnUp = millis();
-        //Number of seconds button was kept pressed
 
-        if (((btnUp - btnDwn) / 1000) > 3)
-        {
-          digitalWrite(ROrelayPin, HIGH);
-          fillingRO = false;
-        }
-      }
-    }
+  if (fillingRO == false)
+  {
+    Serial.println("Not filling Automatically");
+
+    
+      manualFillMetro.interval(minutesToMillis(T));
+                               digitalWrite(roPin, LOW);
+                               manualFillRO = true;
+    
   }
+ 
 }
+
 
 
 void TopFan() {
@@ -341,7 +290,7 @@ void timedEvents(String curTime) {
 }
 
 /*
-void PulseFan() {
+  void PulseFan() {
   const int speedSteps = 5;
   static bool goingUp = true;
   static int x;
@@ -369,12 +318,12 @@ void PulseFan() {
   analogWrite(fanPin, fanSpeed);
 
 
-}
+  }
 */
 void checkhttpclient() {
-  
-    server.handleClient();
-    /*
+
+  server.handleClient();
+  /*
     if(light1RelayState)
     {digitalWrite(light1pin, HIGH);}
     else
@@ -389,38 +338,38 @@ void checkhttpclient() {
   digitalWrite(light1Pin, light1RelayState);
   digitalWrite(light2Pin, light2RelayState);
   digitalWrite(nightLightPin, nightLightRelayState);
-  digitalWrite(roPin,roRelayState);
+  digitalWrite(roPin, roRelayState);
 }
 
 void handle_OnConnect() {
   //LED1status = LOW;
   //LED2status = LOW;
-  
-  server.send(200, "text/html", SendHTML(light1RelayState,light2RelayState,nightLightRelayState,roRelayState,light1On,light1Off,light2On,light2Off,nightLightOn,nightLightOff,manfillTime));
+
+  server.send(200, "text/html", SendHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
 }
 
 void handle_light1on() {
   //LED1status = HIGH;
   Serial.println("Light1 Status: ON");
-  server.send(200, "text/html", SendHTML(true,light2RelayState,nightLightRelayState,roRelayState,manfillTime));
+  server.send(200, "text/html", SendHTML(true, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
 }
 
 void handle_light1off() {
   //LED1status = LOW;
   Serial.println("Light1 Status: OFF");
-  server.send(200, "text/html", SendHTML(false,light2RelayState,nightLightRelayState,roRelayState,manfillTime));
+  server.send(200, "text/html", SendHTML(false, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
 }
 
 void handle_light2on() {
   //LED2status = HIGH;
   Serial.println("Light2 Status: ON");
-  server.send(200, "text/html", SendHTML(light1RelayState,true,nightLightRelayState,roRelayState,manfillTime));
+  server.send(200, "text/html", SendHTML(light1RelayState, true, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
 }
 
 void handle_light2off() {
   //LED2status = LOW;
   Serial.println("Light2 Status: OFF");
-  server.send(200, "text/html", SendHTML(light1RelayState,false,nightLightRelayState,roRelayState,manfillTime));
+  server.send(200, "text/html", SendHTML(light1RelayState, false, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
 }
 
 void handle_NotFound() {
@@ -428,90 +377,102 @@ void handle_NotFound() {
 }
 
 void handle_FillRO() {
-  manfillTime=server.arg("filltime").toInt();
+  manfillTime = server.arg("filltime").toInt();
   Serial.println(manfillTime);
   Serial.println("Fill RO");
-  
-  server.send(200, "text/html", SendHTML(light1RelayState,light2RelayState,nightLightRelayState,true,,l1stopmanfillTime));
+
+  server.send(200, "text/html", SendHTML(light1RelayState, light2RelayState, nightLightRelayState, true, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
 }
 
-String SendHTML(uint8_t light1stat,uint8_t light2stat,uint8_t nitelitestat,uint8_t rostat,String l1start,String l1stop,String l2start,String,l2stop,String nlstart,String nlstop, uint8_t mf ,uint8_t pumpfreq){
-  String ptr = "<!DOCTYPE html> <html>\n";v.l1start
-  ptr +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
-  ptr +="<title>LED Control</title>\n";
-  ptr +="<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
-  ptr +="body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}\n";
-  ptr +=".button {display: block;width: 80px;background-color: #1abc9c;border: none;color: white;padding: 13px 30px;text-decoration: none;font-size: 25px;margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}\n";
-  ptr +=".button-on {background-color: #1abc9c;}\n";
-  ptr +=".button-on:active {background-color: #16a085;}\n";
-  ptr +=".button-off {background-color: #34495e;}\n";
-  ptr +=".button-off:active {background-color: #2c3e50;}\n";
-  ptr +="p {font-size: 14px;color: #888;margin-bottom: 10px;}\n";
-  ptr +="</style>\n";
-  ptr +="</head>\n";
-  ptr +="<body>\n";
-  ptr +="<h1>Terrariium Control</h1>\n";
-     
-  if(light1stat)
-  {ptr +="<p>Light1 Status: ON</p><a class=\"button button-off\" href=\"/light1off\">OFF</a>\n";}
-  else
-  {ptr +="<p>Light1 Status: OFF</p><a class=\"button button-on\" href=\"/light1on\">ON</a>\n";}
+String SendHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat, uint8_t rostat, String l1start, String l1stop, String l2start, String l2stop, String nlstart, String nlstop, uint8_t mf , uint8_t pumpfreq) {
+  String ptr = "<!DOCTYPE html> <html>\n"; 
+  ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+  ptr += "<title>LED Control</title>\n";
+  ptr += "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
+  ptr += "body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}\n";
+  ptr += ".button {display: block;width: 80px;background-color: #1abc9c;border: none;color: white;padding: 13px 30px;text-decoration: none;font-size: 25px;margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}\n";
+  ptr += ".button-on {background-color: #1abc9c;}\n";
+  ptr += ".button-on:active {background-color: #16a085;}\n";
+  ptr += ".button-off {background-color: #34495e;}\n";
+  ptr += ".button-off:active {background-color: #2c3e50;}\n";
+  ptr += "p {font-size: 14px;color: #888;margin-bottom: 10px;}\n";
+  ptr += "</style>\n";
+  ptr += "</head>\n";
+  ptr += "<body>\n";
+  ptr += "<h1>Terrariium Control</h1>\n";
 
-  if(light2stat)
-  {ptr +="<p>Light2 Status: ON</p><a class=\"button button-off\" href=\"/light2off\">OFF</a>\n";}
+  if (light1stat)
+  {
+    ptr += "<p>Light1 Status: ON</p><a class=\"button button-off\" href=\"/light1off\">OFF</a>\n";
+  }
   else
-  {ptr +="<p>Light2 Status: OFF</p><a class=\"button button-on\" href=\"/light2on\">ON</a>\n";}
- 
-  if(nitelitestat)
-  {ptr +="<p>Night Light Status: ON</p><a class=\"button button-off\" href=\"/nightlightoff\">OFF</a>\n";}
-  else
-  {ptr +="<p>Night Light Status: OFF</p><a class=\"button button-on\" href=\"/nightlighton\">ON</a>\n";}
- 
-ptr +="<form action=/FillRO>";
-  ptr +="<label for=fname>Number of minutes to fill</label><br>";
-  ptr +="<input type=number id=filltime name=filltime value=";
-    ptr+= mf;
-    ptr+= "><br>";
-  
-  ptr +="<input type=submit value=Submit>";
-ptr +="</form> ";
+  {
+    ptr += "<p>Light1 Status: OFF</p><a class=\"button button-on\" href=\"/light1on\">ON</a>\n";
+  }
 
-ptr +="<form action=/SetTimes>";
-  ptr +="<label for=fname>Light 1 Start / Stop Time</label><br>";
-  ptr +="<input type=Time id=light1start name=light1start value=";
+  if (light2stat)
+  {
+    ptr += "<p>Light2 Status: ON</p><a class=\"button button-off\" href=\"/light2off\">OFF</a>\n";
+  }
+  else
+  {
+    ptr += "<p>Light2 Status: OFF</p><a class=\"button button-on\" href=\"/light2on\">ON</a>\n";
+  }
+
+  if (nitelitestat)
+  {
+    ptr += "<p>Night Light Status: ON</p><a class=\"button button-off\" href=\"/nightlightoff\">OFF</a>\n";
+  }
+  else
+  {
+    ptr += "<p>Night Light Status: OFF</p><a class=\"button button-on\" href=\"/nightlighton\">ON</a>\n";
+  }
+
+  ptr += "<form action=/FillRO>";
+  ptr += "<label for=fname>Number of minutes to fill</label><br>";
+  ptr += "<input type=number id=filltime name=filltime value=";
+  ptr += mf;
+  ptr += "><br>";
+
+  ptr += "<input type=submit value=Submit>";
+  ptr += "</form> ";
+
+  ptr += "<form action=/SetTimes>";
+  ptr += "<label for=fname>Light 1 Start / Stop Time</label><br>";
+  ptr += "<input type=Time id=light1start name=light1start value=";
   ptr += l1start;
-  ptr+=">";
-  ptr +="<input type=Time id=light1stop name=light1stop value=";
+  ptr += ">";
+  ptr += "<input type=Time id=light1stop name=light1stop value=";
   ptr += l1stop;
-  ptr+=">";
-  ptr+="<br>";
-  ptr +="<label for=fname>Light 2 Start / Stop Time</label><br>";
-  ptr +="<input type=Time id=light2start name=light2start value=";
+  ptr += ">";
+  ptr += "<br>";
+  ptr += "<label for=fname>Light 2 Start / Stop Time</label><br>";
+  ptr += "<input type=Time id=light2start name=light2start value=";
   ptr += l2start;
-  ptr +=">";
-  ptr +="<input type=Time id=light2stop name=light2stop value=";
+  ptr += ">";
+  ptr += "<input type=Time id=light2stop name=light2stop value=";
   ptr += l2stop;
   ptr += ">";
-  ptr+="<br>";
-  ptr +="<label for=fname>Night Light Start / Stop Time</label><br>";
-  ptr +="<input type=Time id=nlightstart name=nlightstart value=";
+  ptr += "<br>";
+  ptr += "<label for=fname>Night Light Start / Stop Time</label><br>";
+  ptr += "<input type=Time id=nlightstart name=nlightstart value=";
   ptr += nlstart;
   ptr += ">";
-  ptr +="<input type=Time id=nlightstop name=nlightstop value=";
-  ptr +=nlstop;
-  ptr +=">";
-  ptr+="<br>";
-  ptr +="<label for=fname>Pump frequency (minutes)</label><br>";
-  ptr +="<input type=number=pumpfreq name=pumpfreq value=";
-  ptr +=pumpfreq;
-  ptr +=">";
-  ptr+="<br>";
-  
-  ptr +="<input type=submit value=Save>";
-ptr +="</form> ";
+  ptr += "<input type=Time id=nlightstop name=nlightstop value=";
+  ptr += nlstop;
+  ptr += ">";
+  ptr += "<br>";
+  ptr += "<label for=fname>Pump frequency (minutes)</label><br>";
+  ptr += "<input type=number=pumpfreq name=pumpfreq value=";
+  ptr += pumpfreq;
+  ptr += ">";
+  ptr += "<br>";
 
-  ptr +="</body>\n";
-  ptr +="</html>\n";
+  ptr += "<input type=submit value=Save>";
+  ptr += "</form> ";
+
+  ptr += "</body>\n";
+  ptr += "</html>\n";
   return ptr;
 }
 
