@@ -1,3 +1,6 @@
+#include <DallasTemperature.h>
+#include <OneWire.h>
+
 #include <ezTime.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -8,11 +11,12 @@ String appVers ="Version 0.1";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin 2
 #define light2Pin 15
-#define nightLightPin 14
+#define nightLightPin 2                 //D4
 #define topFanPin 0                     //Fan to remove condensation in the front glass
 #define pumpPin 16
 #define roPin 14                        //Reverse Osmosis relay
 #define fullROpin 16                     //internal fan that goes along with fogger
+#define tempPin 14                      //D5   DS18B20 Temperature sensor
 //#define ledPin 13
 // *************************************************************************************************************************
 /*
@@ -23,6 +27,9 @@ String appVers ="Version 0.1";
   #define nightInterval 43200000‬
   #define topFanInterval 45   // Interval for top ventilation fan
 */
+//**********************  Temperature Sensor variables  ***************
+OneWire ow(tempPin);
+DallasTemperature tempSensor(&ow);
 //**********************  ezTime stuff ***********************
 Timezone cda;
 const long utcOffsetInSeconds = -18000;           // Offset for the Timezone
@@ -115,8 +122,11 @@ void setup() {
   server.on("/nightlightoff",handle_nightlightoff);
   server.on("/FillRO", handle_FillRO);
   server.on("/SetTimes",handle_SetTimes);
+  server.on("/settings",handle_settings);
   server.begin();
   Serial.println("HTTP server started");
+
+  tempSensor.begin();
 }
 
 void startup() {
@@ -194,6 +204,11 @@ void loop() {
   */
   checkhttpclient();
   checkRO();
+}
+
+float GetTemp() {
+  tempSensor.requestTemperatures();
+  return tempSensor.getTempCByIndex(0);
 }
 
 void pump() {
@@ -378,47 +393,47 @@ void handle_OnConnect() {
   //LED1status = LOW;
   //LED2status = LOW;
 
-  server.send(200, "text/html", SendHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime));
 }
 
 void handle_light1on() {
   //LED1status = HIGH;
   Serial.println("Light1 Status: ON");
   switchLight1(HIGH);
-  server.send(200, "text/html", SendHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime));
 }
 
 void handle_light1off() {
   //LED1status = LOW;
   Serial.println("Light1 Status: OFF");
   switchLight1(LOW);
-  server.send(200, "text/html", SendHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime));
 }
 
 void handle_light2on() {
   //LED2status = HIGH;
   Serial.println("Light2 Status: ON");
   switchLight2(HIGH);
-  server.send(200, "text/html", SendHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime));
 }
 
 void handle_light2off() {
 
   Serial.println("Light2 Status: OFF");
   switchLight2(LOW);
-  server.send(200, "text/html", SendHTML(light1RelayState,light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
+  server.send(200, "text/html", sendMainHTML(light1RelayState,light2RelayState, nightLightRelayState, roRelayState, manfillTime));
 }
 
 void handle_nightlightoff() {
   Serial.println("Night Light Status: OFF");
   switchNightLight(LOW);
-  server.send(200, "text/html", SendHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq)); 
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime)); 
 }
 
 void handle_nightlighton() {
   Serial.println("Night Light Status: ON");
   switchNightLight(HIGH);
-  server.send(200, "text/html", SendHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq)); 
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime)); 
 }
 
 void handle_NotFound() {
@@ -432,7 +447,7 @@ void handle_FillRO() {
     Serial.println(manfillTime);
     Serial.println("Fill RO");
     manualFill(manfillTime);
-    server.send(200, "text/html", SendHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
+    server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime));
   
   
 }
@@ -445,10 +460,15 @@ void handle_SetTimes() {
   nightLightOn=server.arg("nlightstart");
   nightLightOff=server.arg("nlightstop");
   pumpFreq=server.arg("pumpfreq").toInt();
-  server.send(200, "text/html", SendHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff, manfillTime,pumpFreq));
+  pumpTime=server.arg("pumplen").toInt();
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime));
 }
 
-String SendHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat, uint8_t rostat, String l1start, String l1stop, String l2start, String l2stop, String nlstart, String nlstop, uint8_t mf , uint8_t pumpfreq) {
+void handle_settings() {
+  server.send(200,"text/html",sendSettingsHTML(pumpFreq,pumpTime, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff));
+}
+
+String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat, uint8_t rostat,  uint8_t mf ) {
   String ptr = "<!DOCTYPE html> <html>\n"; 
   ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
   ptr += "<title>LED Control</title>\n";
@@ -494,6 +514,7 @@ String SendHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat, ui
     ptr += "<p>Night Light Status: OFF</p><a class=\"button button-on\" href=\"/nightlighton\">ON</a>\n";
   }
 
+
   ptr += "<form action=/FillRO>";
   ptr += "<label for=fname>Number of minutes to fill</label><br>";
   ptr += "<input type=number id=filltime name=filltime value=";
@@ -509,38 +530,60 @@ String SendHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat, ui
   }
   ptr += "</form> ";
 
+  //ptr += "<p>Application Settings</p><a class=\"button button-on\" href=\"/settings\">Settings</a>\n";
+  ptr += "<a href=/settings>Settings</a>";
+  ptr += "</body>\n";
+  ptr += "</html>\n";
+  return ptr;
+}
+
+String sendSettingsHTML(uint8_t pumpfreq,uint8_t pumpLen,String l1start, String l1stop, String l2start, String l2stop, String nlstart, String nlstop) {
+  String ptr = "<!DOCTYPE html> <html>\n"; 
+  ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+  ptr += "<title>App Settings</title>\n";
+  ptr += "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
+  ptr += "body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}\n";
+  ptr += ".button {display: block;width: 80px;background-color: #1abc9c;border: none;color: white;padding: 13px 30px;text-decoration: none;font-size: 25px;margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}\n";
+  ptr += ".button-on {background-color: #1abc9c;}\n";
+  ptr += ".button-on:active {background-color: #16a085;}\n";
+  ptr += ".button-off {background-color: #34495e;}\n";
+  ptr += ".button-off:active {background-color: #2c3e50;}\n";
+  ptr += "p {font-size: 14px;color: #888;margin-bottom: 10px;}\n";
+  ptr += "</style>\n";
+  ptr += "</head>\n";
+  ptr += "<body>\n";
+  ptr += "<h1>Terrarium Control Settings</h1>";
   ptr += "<form action=/SetTimes>";
   ptr += "<label for=fname>Pump frequency (minutes)</label><br>";
   ptr += "<input type=number id=pumpfreq name=pumpfreq value=";
   ptr += pumpfreq;
-  ptr += "><br>";
+  ptr += "><br><br>";
+  ptr += "<label for=fname>Pump Duration (seconds)</label><br>";
+  ptr += "<input type=number id=pumplen name=pumplen value=";
+  ptr += pumpLen;
+  ptr += "><br><br>";
   ptr += "<label for=fname>Light 1 Start / Stop Time</label><br>";
   ptr += "<input type=Time id=light1start name=light1start value=";
   ptr += l1start;
   ptr += ">";
   ptr += "<input type=Time id=light1stop name=light1stop value=";
   ptr += l1stop;
-  ptr += ">";
-  ptr += "<br>";
+  ptr += "><br><br>";
   ptr += "<label for=fname>Light 2 Start / Stop Time</label><br>";
   ptr += "<input type=Time id=light2start name=light2start value=";
   ptr += l2start;
   ptr += ">";
   ptr += "<input type=Time id=light2stop name=light2stop value=";
   ptr += l2stop;
-  ptr += ">";
-  ptr += "<br>";
+  ptr += "><br><br>";
   ptr += "<label for=fname>Night Light Start / Stop Time</label><br>";
   ptr += "<input type=Time id=nlightstart name=nlightstart value=";
   ptr += nlstart;
   ptr += ">";
   ptr += "<input type=Time id=nlightstop name=nlightstop value=";
   ptr += nlstop;
-  ptr += ">";
-  ptr += "<br>";
-
-  ptr += "<br>";
-
+  ptr += "><br><br>";
+ 
   ptr += "<input type=submit value=Save>";
   ptr += "</form> ";
 
@@ -548,8 +591,6 @@ String SendHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat, ui
   ptr += "</html>\n";
   return ptr;
 }
-
-
 
 
 unsigned long secondsToMillis(unsigned long sec) {
