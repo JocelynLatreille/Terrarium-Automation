@@ -14,8 +14,8 @@ String appVers ="Version 0.1";
 #define nightLightPin 2                 //D4
 #define topFanPin 0                     //Fan to remove condensation in the front glass
 #define pumpPin 16
-#define roPin 14                        //Reverse Osmosis relay
-#define fullROpin 16                     //internal fan that goes along with fogger
+#define roPin 13                        //Reverse Osmosis relay
+#define fullROpin 12                     //internal fan that goes along with fogger
 #define tempPin 14                      //D5   DS18B20 Temperature sensor
 //#define ledPin 13
 // *************************************************************************************************************************
@@ -123,6 +123,8 @@ void setup() {
   server.on("/FillRO", handle_FillRO);
   server.on("/SetTimes",handle_SetTimes);
   server.on("/settings",handle_settings);
+  server.on("/pumpOn",handle_pumpOn);
+  server.on("/pumpOff",handle_pumpOff);
   server.begin();
   Serial.println("HTTP server started");
 
@@ -207,8 +209,11 @@ void loop() {
 }
 
 float GetTemp() {
+  /*
   tempSensor.requestTemperatures();
   return tempSensor.getTempCByIndex(0);
+  */
+  return 37.99;
 }
 
 void pump() {
@@ -220,7 +225,13 @@ void pump() {
   else {
     pumpState = LOW;
     Serial.println("Stopping pump");
-    pumpMetro.interval(minutesToMillis(pumpFreq));
+    if ((light1RelayState==LOW) && (light2RelayState==LOW)) {
+      pumpMetro.interval(minutesToMillis(23));
+    }
+    else {
+      pumpMetro.interval(minutesToMillis(pumpFreq));
+    }
+    
   }
   digitalWrite(pumpPin, pumpState);
   //digitalWrite(ledPin,pumpState);
@@ -393,47 +404,47 @@ void handle_OnConnect() {
   //LED1status = LOW;
   //LED2status = LOW;
 
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime));
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime,GetTemp(),pumpState));
 }
 
 void handle_light1on() {
   //LED1status = HIGH;
   Serial.println("Light1 Status: ON");
   switchLight1(HIGH);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime));
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime,GetTemp(),pumpState));
 }
 
 void handle_light1off() {
   //LED1status = LOW;
   Serial.println("Light1 Status: OFF");
   switchLight1(LOW);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime));
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime,GetTemp(),pumpState));
 }
 
 void handle_light2on() {
   //LED2status = HIGH;
   Serial.println("Light2 Status: ON");
   switchLight2(HIGH);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime));
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime,GetTemp(),pumpState));
 }
 
 void handle_light2off() {
 
   Serial.println("Light2 Status: OFF");
   switchLight2(LOW);
-  server.send(200, "text/html", sendMainHTML(light1RelayState,light2RelayState, nightLightRelayState, roRelayState, manfillTime));
+  server.send(200, "text/html", sendMainHTML(light1RelayState,light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
 }
 
 void handle_nightlightoff() {
   Serial.println("Night Light Status: OFF");
   switchNightLight(LOW);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime)); 
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime,GetTemp(),pumpState)); 
 }
 
 void handle_nightlighton() {
   Serial.println("Night Light Status: ON");
   switchNightLight(HIGH);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime)); 
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState)); 
 }
 
 void handle_NotFound() {
@@ -447,7 +458,7 @@ void handle_FillRO() {
     Serial.println(manfillTime);
     Serial.println("Fill RO");
     manualFill(manfillTime);
-    server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime));
+    server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
   
   
 }
@@ -461,17 +472,31 @@ void handle_SetTimes() {
   nightLightOff=server.arg("nlightstop");
   pumpFreq=server.arg("pumpfreq").toInt();
   pumpTime=server.arg("pumplen").toInt();
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime));
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
+}
+
+void handle_pumpOn() {
+  pumpState = HIGH;
+  Serial.println("Manually Pumping");
+  digitalWrite(pumpPin, pumpState);
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
+}
+
+void handle_pumpOff() {
+  pumpState = LOW;
+  Serial.println("Stoping Pump");
+  digitalWrite(pumpPin, pumpState);
+  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
 }
 
 void handle_settings() {
   server.send(200,"text/html",sendSettingsHTML(pumpFreq,pumpTime, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff));
 }
 
-String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat, uint8_t rostat,  uint8_t mf ) {
+String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat, uint8_t rostat,  uint8_t mf ,float temp,uint8_t pumpstate) {
   String ptr = "<!DOCTYPE html> <html>\n"; 
   ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
-  ptr += "<title>LED Control</title>\n";
+  ptr += "<title>Terrarium Control</title>\n";
   ptr += "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
   ptr += "body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}\n";
   ptr += ".button {display: block;width: 80px;background-color: #1abc9c;border: none;color: white;padding: 13px 30px;text-decoration: none;font-size: 25px;margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}\n";
@@ -487,6 +512,9 @@ String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat
   ptr += "<h2>";
   ptr += appVers;
   ptr += "</h2>\n";
+  ptr += "<p>Temperature: ";
+  ptr += temp;
+  ptr += "C</p>";
   if (light1stat)
   {
     ptr += "<p>Light1 Status: ON</p><a class=\"button button-off\" href=\"/light1off\">OFF</a>\n";
@@ -513,7 +541,12 @@ String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat
   {
     ptr += "<p>Night Light Status: OFF</p><a class=\"button button-on\" href=\"/nightlighton\">ON</a>\n";
   }
-
+  if (pumpstate==LOW) {
+    ptr += "<p>Water Misting</p><a class=\"button button-on\" href=\"/pumpOn\">Start</a>\n";
+  }
+  else {
+    ptr += "<p>Water Misting</p><a class=\"button button-off\" href=\"/pumpOff\">Stop</a>\n";
+  }
 
   ptr += "<form action=/FillRO>";
   ptr += "<label for=fname>Number of minutes to fill</label><br>";
@@ -597,8 +630,8 @@ unsigned long secondsToMillis(unsigned long sec) {
   return sec * 1000;
 }
 
-unsigned long minutesToMillis(unsigned long min) {
-  return min * 60 * 1000;
+unsigned long minutesToMillis(unsigned long minutes) {
+  return minutes * 60 * 1000;
 }
 
 unsigned long hoursToMillis(unsigned long hrs) {
