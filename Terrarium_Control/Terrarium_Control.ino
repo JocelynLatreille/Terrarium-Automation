@@ -5,18 +5,29 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 
-String appVers ="Version 0.1";
-// Metro - Version: Latest
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
 #include <Metro.h>
+
+String appVers ="Version 0.1";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
-#define light1Pin 2
-#define light2Pin 15
-#define nightLightPin 2                 //D4
-#define topFanPin 0                     //Fan to remove condensation in the front glass
-#define pumpPin 16
+#define light1Pin D0                    //Relay 1 
+#define light2Pin D3                    //Relay 4
+#define nightLightPin D5                 //Relay 5
+#define topFanPin D8                     //Fan to remove condensation in the front glass
+#define pumpPin 3                       //Relay 5 (RX pin on NodeMCU)
 #define roPin 13                        //Reverse Osmosis relay
-#define fullROpin 12                     //internal fan that goes along with fogger
-#define tempPin 14                      //D5   DS18B20 Temperature sensor
+#define fullROpin D6                     //Switch 1 - P6
+#define tempPin D4                      //D5   DS18B20 Temperature sensor
+
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+
 //#define ledPin 13
 // *************************************************************************************************************************
 /*
@@ -67,8 +78,31 @@ int roRelayState = LOW;
 uint8_t manfillTime = 11;   //Nuber of minutes to manually fill RO bottles
 uint8_t fullRO;                //Level of RO supply
 
+
+typedef struct {
+  String IP;
+  String Temp;
+}messages;
+
+ messages mssg={"",""} ;
+
+
 void setup() {
-  Serial.begin(115200);
+  
+  Wire.begin();
+  Adafruit_SSD1306 display(-1);
+  Serial.begin(9600);
+  while (!Serial);
+ 
+  
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+ 
+  display.setTextSize(1);             // Normal 1:1 pixel scale
+  display.setTextColor(SSD1306_WHITE);        // Draw white text
+  display.setCursor(0,0);             // Start at top-left corner
+  display.clearDisplay();
+  display.display(); 
+
   delay(3000); // wait for console opening
 
   //************************  Set Pins  **************************
@@ -90,11 +124,13 @@ void setup() {
   pumpMetro.interval(hoursToMillis(20));        //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
   topFanMetro.interval(hoursToMillis(20));      //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
   checkCurTime.interval(secondsToMillis(45));   //Check current time for any sceduled events
-
+  
 
   Serial.println("Connecting to ");
+  display.print("Connecting to \n");
   Serial.println(ssid);
-
+  display.println(ssid);
+  display.display();
   //connect to your local wi-fi network
   WiFi.begin(ssid, password);
 
@@ -102,11 +138,23 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.print(".");
+    display.print(".");
+    display.display();
   }
   waitForSync();
+  display.clearDisplay();
+  display.setCursor(0,0);
   Serial.println("");
-  Serial.println("WiFi connected..!");
-  Serial.print("Got IP: ");  Serial.println(WiFi.localIP());
+  Serial.println("WiFi connected..!\n");
+  
+  display.println("WiFi connected..!");
+  mssg.IP ="test";
+  Serial.print("Got IP: ");  
+  Serial.println(WiFi.localIP());
+  display.print("Got IP: ");  
+  display.println(WiFi.localIP());
+  display.display();
+  delay(3000);
 
   cda.setPosix("EST5EDT,M3.5.0,M10.5.0");     //Sets timezone to GMT+5, aka here
   Serial.println(cda.dateTime());             //Prints datetime
@@ -159,7 +207,7 @@ void startup() {
     digitalWrite(light2Pin, HIGH);    // Turning Light 2 ON
     light2RelayState=HIGH;
     pump();     //Lights are on, start the misting sequence
-    TopFan();  //Starts top fan
+    topFan();  //Starts top fan
 
 
   }
@@ -189,7 +237,11 @@ void loop() {
   if (pumpMetro.check() == 1) {
     Serial.println("Pump Event");
     pump();
+  }
 
+  if (topFanMetro.check() ==1) {
+    Serial.println("Top Fan Event");
+    topFan();
   }
 
   if ((manualFillMetro.check() == 1) && (roRelayState == HIGH)) {
@@ -209,11 +261,12 @@ void loop() {
 }
 
 float GetTemp() {
-  /*
+  
   tempSensor.requestTemperatures();
   return tempSensor.getTempCByIndex(0);
-  */
+  /*
   return 37.99;
+  */
 }
 
 void pump() {
@@ -297,7 +350,7 @@ void switchNightLight(uint8_t state) {
    nightLightRelayState=state;
 }
 
-void TopFan() {
+void topFan() {
   if (topFanState == LOW) {
     topFanState = HIGH;
     Serial.println("Starting Top Fan");
@@ -320,7 +373,7 @@ void timedEvents(String curTime) {
     Serial.println("Turn Light1 ON");
     switchLight1(HIGH);
     Serial.println("Start Top fan");
-    TopFan();
+    topFan();
   }
   else if (curTime == light2On) {
     Serial.println("Turn Light2 ON");
