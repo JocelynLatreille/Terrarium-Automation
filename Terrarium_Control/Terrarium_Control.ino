@@ -11,14 +11,14 @@
 
 #include <Metro.h>
 
-String appVers ="Version 0.1";
+String appVers ="Version 1.0";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4
 #define nightLightPin D5                 //Relay 5
 #define topFanPin D8                     //Fan to remove condensation in the front glass
 #define pumpPin 3                       //Relay 5 (RX pin on NodeMCU)
-#define roPin 13                        //Reverse Osmosis relay
+#define roPin D7                        //Reverse Osmosis relay
 #define fullROpin D6                     //Switch 1 - P6
 #define tempPin D4                      //D5   DS18B20 Temperature sensor
 
