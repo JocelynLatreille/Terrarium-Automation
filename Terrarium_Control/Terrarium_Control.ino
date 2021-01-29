@@ -11,12 +11,13 @@
 
 #include <Metro.h>
 
-String appVers ="Version 1.0";
+String appVers ="Version 1.3";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
-#define light2Pin D3                    //Relay 4
-#define nightLightPin D5                 //Relay 5
-#define topFanPin D8                     //Fan to remove condensation in the front glass
+#define light2Pin D3                    //Relay 4    
+//#define nightLightPin D5                 //Relay 5  Design issue on V1.0 of pcb prevents night lights :-(
+//#define topFanPin D8                     //Fan to remove condensation in the front glass
+#define topFanPin D5                     //Fan to remove condensation in the front glass
 #define pumpPin 3                       //Relay 5 (RX pin on NodeMCU)
 #define roPin D7                        //Reverse Osmosis relay
 #define fullROpin D6                     //Switch 1 - P6
@@ -59,6 +60,8 @@ String nightLightOn = "21:00";
 String nightLightOff = "23:45";
 uint8_t pumpFreq = 180;         //Pump frequency in minutes
 uint8_t pumpTime = 10;          //Number of seconds to run the pump
+uint8_t fanTime = 10;           //Number of minutes to run the fan
+uint8_t fanFreq = 45;           //Fan frequency in minutes
 // ****************  recurring events ****************
 Metro pumpMetro ;         //
 //Metro fogMetro ;
@@ -77,7 +80,7 @@ int nightLightRelayState = LOW;
 int roRelayState = LOW;
 uint8_t manfillTime = 11;   //Nuber of minutes to manually fill RO bottles
 uint8_t fullRO;                //Level of RO supply
-
+bool manFilling = false;
 
 typedef struct {
   String IP;
@@ -108,7 +111,7 @@ void setup() {
   //************************  Set Pins  **************************
   pinMode(light1Pin, OUTPUT);
   pinMode(light2Pin, OUTPUT);
-  pinMode(nightLightPin, OUTPUT);
+ // pinMode(nightLightPin, OUTPUT);
   pinMode(topFanPin, OUTPUT);
   pinMode(pumpPin, OUTPUT);
   pinMode(roPin, OUTPUT);
@@ -116,7 +119,7 @@ void setup() {
 
   digitalWrite(light1Pin, LOW);
   digitalWrite(light2Pin, LOW);
-  digitalWrite(nightLightPin, LOW);
+  //digitalWrite(nightLightPin, LOW);
   digitalWrite(topFanPin, LOW);
   digitalWrite(pumpPin, LOW);
   digitalWrite(roPin, LOW);
@@ -148,10 +151,9 @@ void setup() {
   Serial.println("WiFi connected..!\n");
   
   display.println("WiFi connected..!");
-  mssg.IP ="test";
-  Serial.print("Got IP: ");  
+  Serial.print("IP: ");  
   Serial.println(WiFi.localIP());
-  display.print("Got IP: ");  
+  display.print("IP: ");  
   display.println(WiFi.localIP());
   display.display();
   delay(3000);
@@ -166,8 +168,8 @@ void setup() {
   server.on("/light1off", handle_light1off);
   server.on("/light2on", handle_light2on);
   server.on("/light2off", handle_light2off);
-  server.on("/nightlighton",handle_nightlighton);
-  server.on("/nightlightoff",handle_nightlightoff);
+ // server.on("/nightlighton",handle_nightlighton);
+ // server.on("/nightlightoff",handle_nightlightoff);
   server.on("/FillRO", handle_FillRO);
   server.on("/SetTimes",handle_SetTimes);
   server.on("/settings",handle_settings);
@@ -215,7 +217,7 @@ void startup() {
   if ((cda.hour() >= nightLightOn.substring(0, 2).toInt()) && (cda.hour() <= nightLightOff.substring(0, 2).toInt())) {
 
     Serial.println("Turning Night Light On");
-    digitalWrite(nightLightPin, HIGH);    // Turning night Light  ON
+  //  digitalWrite(nightLightPin, HIGH);    // Turning night Light  ON
     nightLightRelayState=HIGH;
 
   }
@@ -246,10 +248,12 @@ void loop() {
 
   if ((manualFillMetro.check() == 1) && (roRelayState == HIGH)) {
     stopRO();
+    manFilling=false;
   }
   /*
     The relay I used somehow seem to be triggered by a lOW pin, and not a hHIG|h one
     somehow....
+    
 
     if (fogMetro.check() == 1) {
     Serial.println("Fogger event");
@@ -279,7 +283,7 @@ void pump() {
     pumpState = LOW;
     Serial.println("Stopping pump");
     if ((light1RelayState==LOW) && (light2RelayState==LOW)) {
-      pumpMetro.interval(minutesToMillis(23));
+      pumpMetro.interval(hoursToMillis(23));        // Stop the pump untill the next time Light and 2 are turned on
     }
     else {
       pumpMetro.interval(minutesToMillis(pumpFreq));
@@ -296,6 +300,7 @@ void stopRO() {
 }
 
 void checkRO() {
+  if (manFilling!=true) {           //Only check Float switch if not manually filling
   static unsigned long t;
   fullRO = digitalRead(fullROpin);
   if ((roRelayState == LOW) && (fullRO == HIGH)) {
@@ -316,6 +321,8 @@ void checkRO() {
     roRelayState=LOW;
     t=0;
   }
+  }
+
  
 }
 
@@ -328,10 +335,12 @@ void manualFill(uint8_t T) {
       manualFillMetro.interval(minutesToMillis(T));
       digitalWrite(roPin, HIGH);
       roRelayState = HIGH;
+      manFilling=true;
   }
  else {
       stopRO();
       manualFillMetro.interval(hoursToMillis(24));
+      manFilling=false;
  }
 }
 
@@ -346,20 +355,39 @@ void switchLight2(uint8_t state) {
 }
 
 void switchNightLight(uint8_t state) {
-   digitalWrite(nightLightPin, state);
+//   digitalWrite(nightLightPin, state);
    nightLightRelayState=state;
 }
 
+void updateDisplay(int Line,String msg) {
+   Adafruit_SSD1306 display(-1);
+   display.setCursor(Line,0);
+   display.print("                      ");
+   display.display();
+   display.setCursor(Line,0);
+   display.print(msg);
+   display.display();
+}
+
 void topFan() {
+  String msg;
   if (topFanState == LOW) {
     topFanState = HIGH;
-    Serial.println("Starting Top Fan");
-    topFanMetro.interval(minutesToMillis(10));
+    msg="Starting Top Fan for ";
+    msg += fanTime;
+    msg += " minutes";
+    Serial.println(msg);
+    topFanMetro.interval(minutesToMillis(fanTime));
+    updateDisplay(3,"Starting Fan");
   }
   else {
+    msg = "Stoping Top Fan";
+    msg += fanFreq;
+    msg += " minutes";
     topFanState = LOW;
-    Serial.println("Stoping Top Fan");
-    topFanMetro.interval(minutesToMillis(45));
+    Serial.println(msg);
+     updateDisplay(3,"Stoping Fan");
+    topFanMetro.interval(minutesToMillis(fanFreq));
   }
   digitalWrite(topFanPin, topFanState);
 
@@ -367,7 +395,7 @@ void topFan() {
 
 void timedEvents(String curTime) {
   Serial.print("current Time : ");
-  Serial.println(curTime);
+  Serial.println(cda.dateTime("H:i"));
 
   if (curTime == light1On) {
     Serial.println("Turn Light1 ON");
@@ -378,7 +406,8 @@ void timedEvents(String curTime) {
   else if (curTime == light2On) {
     Serial.println("Turn Light2 ON");
     switchLight2(HIGH);
-    pumpMetro.interval(hoursToMillis(1));    //pump will run 1 hour after light are turned on
+    pump();
+    //pumpMetro.interval(hoursToMillis(1));    //pump will run 1 hour after light are turned on
 
   }
   else if (curTime == light1Off) {
@@ -449,7 +478,7 @@ void checkhttpclient() {
 
   digitalWrite(light1Pin, light1RelayState);
   digitalWrite(light2Pin, light2RelayState);
-  digitalWrite(nightLightPin, nightLightRelayState);
+//  digitalWrite(nightLightPin, nightLightRelayState);
   digitalWrite(roPin, roRelayState);
 }
 
@@ -543,7 +572,7 @@ void handle_pumpOff() {
 }
 
 void handle_settings() {
-  server.send(200,"text/html",sendSettingsHTML(pumpFreq,pumpTime, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff));
+  server.send(200,"text/html",sendSettingsHTML(pumpFreq,pumpTime,fanTime,fanFreq, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff));
 }
 
 String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat, uint8_t rostat,  uint8_t mf ,float temp,uint8_t pumpstate) {
@@ -623,7 +652,7 @@ String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat
   return ptr;
 }
 
-String sendSettingsHTML(uint8_t pumpfreq,uint8_t pumpLen,String l1start, String l1stop, String l2start, String l2stop, String nlstart, String nlstop) {
+String sendSettingsHTML(uint8_t pumpfreq,uint8_t pumpLen,uint8_t fanLen,uint8_t fanfreq, String l1start, String l1stop, String l2start, String l2stop, String nlstart, String nlstop) {
   String ptr = "<!DOCTYPE html> <html>\n"; 
   ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
   ptr += "<title>App Settings</title>\n";
@@ -647,6 +676,14 @@ String sendSettingsHTML(uint8_t pumpfreq,uint8_t pumpLen,String l1start, String 
   ptr += "<label for=fname>Pump Duration (seconds)</label><br>";
   ptr += "<input type=number id=pumplen name=pumplen value=";
   ptr += pumpLen;
+  ptr += "><br><br>";
+  ptr += "<label for=fname>Fan frequency (minutes)</label><br>";
+  ptr += "<input type=number id=fanfreq name=fanfreq value=";
+  ptr += fanfreq;
+  ptr += "><br><br>";
+  ptr += "<label for=fname>Fan Duration (minutes)</label><br>";
+  ptr += "<input type=number id=fanLen name=fanLen value=";
+  ptr += fanLen;
   ptr += "><br><br>";
   ptr += "<label for=fname>Light 1 Start / Stop Time</label><br>";
   ptr += "<input type=Time id=light1start name=light1start value=";
