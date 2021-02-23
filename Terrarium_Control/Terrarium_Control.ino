@@ -11,7 +11,7 @@
 
 #include <Metro.h>
 
-String appVers ="Version 1.4";
+String appVers ="Version 1.6";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4    
@@ -30,6 +30,8 @@ String appVers ="Version 1.4";
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+
 //#define ledPin 13
 // *************************************************************************************************************************
 /*
@@ -47,8 +49,10 @@ DallasTemperature tempSensor(&ow);
 Timezone cda;
 const long utcOffsetInSeconds = -18000;           // Offset for the Timezone
 //*******************  Wi-Fi info ************************
-const char* ssid = "whipet";  // Enter SSID here
-const char* password = "b1gb00b5";  //Enter Password here
+//const char* ssid = "whipet";  // Enter SSID here
+char ssid[] = "whipet";
+//const char* password = "b1gb00b5";  //Enter Password here
+char password[] = "b1gb00b5";
 ESP8266WebServer server(80);
 //***********************  Timed events schedule  ************************
 //Zoomed Light = Light   Sunblaster Light = light2
@@ -63,6 +67,7 @@ uint8_t pumpFreq = 180;         //Pump frequency in minutes
 uint8_t pumpTime = 10;          //Number of seconds to run the pump
 uint8_t fanTime = 10;           //Number of minutes to run the fan
 uint8_t fanFreq = 45;           //Fan frequency in minutes
+char token[] = "vRYJMQpRDKhEWmpShmRxQ0jHGX1kzGGz";
 // ****************  recurring events ****************
 Metro pumpMetro ;         //
 Metro displayMetro ;
@@ -82,6 +87,7 @@ int roRelayState = LOW;
 uint8_t manfillTime = 11;   //Nuber of minutes to manually fill RO bottles
 uint8_t fullRO;                //Level of RO supply
 bool manFilling = false;
+
 // 'images', 128x64px
 const unsigned char koala [] PROGMEM = {
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
@@ -151,15 +157,10 @@ const unsigned char koala [] PROGMEM = {
 };
 
 
-
 void setup() {
-  
-  //Wire.begin();
-  //Adafruit_SSD1306 display(-1);
-  
+    
   Serial.begin(115200);
   while (!Serial);
- 
   
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
  
@@ -203,7 +204,7 @@ void setup() {
   display.display();
   //connect to your local wi-fi network
   WiFi.begin(ssid, password);
-
+  
   //check wi-fi is connected to wi-fi network
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -319,13 +320,15 @@ void splashScreen() {
 }
 
 void loop() {
-
+  static String lastTime;         //Prevents calling the same Timed event twice
+  
   if (displayMetro.check() ==1 ) {
-     updateDisplay("");       //Update LCD display
+     updateDisplay("");       //Update LCD display with alternating info
   }
-  if (checkCurTime.check() == 1) {
+  
+  if ((checkCurTime.check() == 1) && (cda.dateTime("H:i")!=lastTime)) {
+    lastTime=cda.dateTime("H:i");
     Serial.println("timed event");
-   
     timedEvents(cda.dateTime("H:i"));
   }
 
@@ -334,15 +337,19 @@ void loop() {
     pump();
   }
 
-  if (topFanMetro.check() ==1) {
+  if (topFanMetro.check() == 1) {
     Serial.println("Top Fan Event");
     topFan();
   }
 
-  if ((manFilling==true) && (manualFillMetro.check() == 1) && (roRelayState == HIGH)) {
+  if ((manFilling == true) && (manualFillMetro.check() == 1) && (roRelayState == HIGH)) {
     Serial.println("Manual Filling Timed event");
     stopRO();
     manFilling=false;
+  }
+  else if (manFilling == false) {
+    //Serial.println("Checking RO");
+    checkRO();
   }
   /*
     The relay I used somehow seem to be triggered by a lOW pin, and not a hHIG|h one
@@ -355,7 +362,7 @@ void loop() {
     }
   */
   checkhttpclient();
-  checkRO();
+  
 }
 
 float GetTemp() {
@@ -390,12 +397,13 @@ void pump() {
 
 void stopRO() {
   Serial.println("Stopping RO");
+  updateDisplay("Stopping RO");
   digitalWrite(roPin, LOW);
   roRelayState = LOW;
 }
 
 void checkRO() {
-  if (manFilling!=true) {           //Only check Float switch if not manually filling
+  if (manFilling == false) {           //Only check Float switch if not manually filling
   static unsigned long t;
   fullRO = digitalRead(fullROpin);
   //Serial.print("Full RO = ");
@@ -425,10 +433,13 @@ void checkRO() {
     t=0;
     }
     else {
-      //Serial.println("Fuck you ");
+      //Serial.println("RO Is full");
     }
   
   
+  }
+  else {
+    Serial.println("Manually filling.... ");
   }
  
  
@@ -436,21 +447,21 @@ void checkRO() {
 
 void manualFill(uint8_t T) {
   Serial.println("Manual Fill called");
-  if (roRelayState == LOW)
-  
-  {
-       
+  if (roRelayState == LOW) {
+      manualFillMetro.reset();
       manualFillMetro.interval(minutesToMillis(T));
       digitalWrite(roPin, HIGH);
       roRelayState = HIGH;
       manFilling=true;
-      updateDisplay("Manual fill RO");
+      
+    
   }
  else {
       stopRO();
-      manualFillMetro.interval(hoursToMillis(24));
       manFilling=false;
-      updateDisplay("Stop filling RO");
+      manualFillMetro.reset();
+      manualFillMetro.interval(hoursToMillis(24));
+      
  }
 }
 
@@ -464,17 +475,20 @@ void switchLight2(uint8_t state) {
    light2RelayState=state;
 }
 
+/*
 void switchNightLight(uint8_t state) {
 //   digitalWrite(nightLightPin, state);
    nightLightRelayState=state;
 }
-
+*/
 void updateDisplay(String msg) {
-  static int disp;
+  static int disp;      
   
    display.clearDisplay();
+   if (msg == "" ) {
+    
    
-   switch(disp) {
+      switch(disp) {
       case 0:
         display.setCursor(0,14);
         display.setTextSize(4);
@@ -514,6 +528,13 @@ void updateDisplay(String msg) {
       default:
         disp=0;
         break;
+      }
+   }
+   else {
+    display.setCursor(0,0);
+    display.setTextSize(1);
+    display.println(msg);
+    
    }
    display.display();
    /*
@@ -541,15 +562,15 @@ void topFan() {
     msg += " minutes";
     Serial.println(msg);
     topFanMetro.interval(minutesToMillis(fanTime));
-    updateDisplay("Starting Fan");
+    updateDisplay(msg);
   }
   else {
-    msg = "Stoping Top Fan";
+    msg = "Pausing Top Fan for";
     msg += fanFreq;
     msg += " minutes";
     topFanState = LOW;
     Serial.println(msg);
-     updateDisplay("Stoping Fan");
+    updateDisplay(msg);
     topFanMetro.interval(minutesToMillis(fanFreq));
   }
   digitalWrite(topFanPin, topFanState);
@@ -561,7 +582,7 @@ void timedEvents(String curTime) {
   Serial.println(cda.dateTime("H:i"));
 
   if (curTime == light1On) {
-    updateDisplay("Light 1 ON Event");
+    updateDisplay("Turn Light1 ON");
     Serial.println("Turn Light1 ON");
     switchLight1(HIGH);
     Serial.println("Start Top fan");
@@ -569,22 +590,22 @@ void timedEvents(String curTime) {
     topFan();
   }
   else if (curTime == light2On) {
-    updateDisplay("Light 2 ON Event");
+    updateDisplay("Turn Light2 ON");
     Serial.println("Turn Light2 ON");
     switchLight2(HIGH);
-    pump();
-    //pumpMetro.interval(hoursToMillis(1));    //pump will run 1 hour after light are turned on
+    //pump();
+    pumpMetro.interval(secondsToMillis(10));    //pump will run 10 seconds after light are turned on
 
   }
   else if (curTime == light1Off) {
-    updateDisplay("Light 1 OFF Event");
+    updateDisplay("Turn Light1 Off");
     Serial.println("Turn Light1 Off & Night Light On");
     switchLight1(LOW);
     topFanMetro.interval(hoursToMillis(23));       //stops top fan for the night
     pumpMetro.interval(hoursToMillis(23));         // stops pumpEvents for the night
   }
   else if (curTime == light2Off) {
-    updateDisplay("Light 2 OFF Event");
+    updateDisplay("Turn Light2 Off");
     Serial.println("Turn Light2 Off");
     switchLight2(LOW);
   }
@@ -690,7 +711,7 @@ void handle_light2off() {
   switchLight2(LOW);
   server.send(200, "text/html", sendMainHTML(light1RelayState,light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
 }
-
+/*
 void handle_nightlightoff() {
   Serial.println("Night Light Status: OFF");
   updateDisplay("Manually turning OFF Night Light");
@@ -704,6 +725,7 @@ void handle_nightlighton() {
   switchNightLight(HIGH);
   server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState)); 
 }
+*/
 
 void handle_NotFound() {
   server.send(404, "text/plain", "Not found");
@@ -718,7 +740,7 @@ void handle_FillRO() {
     msg += manfillTime;
     msg += " minutes";
     updateDisplay(msg);
-    Serial.println("Filling RO");
+    Serial.println(msg);
     manualFill(manfillTime);
     server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
   
