@@ -11,7 +11,7 @@
 
 #include <Metro.h>
 
-String appVers ="Version 1.6";
+String appVers ="Version 1.7.3";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4    
@@ -76,14 +76,22 @@ Metro checkCurTime ;      // Event to check the current time and act on any time
 Metro topFanMetro ;       // Top fan to remove water from front glass
 Metro manualFillMetro;    //RO water manual fill
 //****************************************************
+struct relayState_t {
+  int pump;
+  int topFan;
+  int light1;
+  int light2;
+  int ro;
+} relayState;
+/*
 int pumpState = LOW;
 //int fogState = LOW;               //No need for a fan state as it will run at the same time as the fan
 int topFanState = LOW;            //Top ventilation fan
-// Rename those to relayX
 int light1RelayState = LOW;
 int light2RelayState = LOW;
 int nightLightRelayState = LOW;
 int roRelayState = LOW;
+*/
 uint8_t manfillTime = 11;   //Nuber of minutes to manually fill RO bottles
 uint8_t fullRO;                //Level of RO supply
 bool manFilling = false;
@@ -161,19 +169,8 @@ void setup() {
     
   Serial.begin(115200);
   while (!Serial);
-  
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
- 
-  display.setTextSize(1);             // Normal 1:1 pixel scale
-  display.setTextColor(SSD1306_WHITE);        // Draw white text
-  display.setCursor(0,0);             // Start at top-left corner
-  display.clearDisplay();
-  display.display(); 
-  splashScreen();
 
-  delay(3000); // wait for console opening
-
-  //************************  Set Pins  **************************
+   //************************  Set Pins  **************************
   pinMode(light1Pin, OUTPUT);
   pinMode(light2Pin, OUTPUT);
  // pinMode(nightLightPin, OUTPUT);
@@ -188,6 +185,18 @@ void setup() {
   digitalWrite(topFanPin, LOW);
   digitalWrite(pumpPin, LOW);
   digitalWrite(roPin, LOW);
+  //************************ Set Display ***************************   
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.setTextSize(1);             // Normal 1:1 pixel scale
+  display.setTextColor(SSD1306_WHITE);        // Draw white text
+  display.setCursor(0,0);             // Start at top-left corner
+  display.clearDisplay();
+  display.display(); 
+  splashScreen();
+
+  delay(3000); // wait for console opening
+
+ 
   //************************ Set recurring events  ********************
   pumpMetro.interval(hoursToMillis(20));        //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
   topFanMetro.interval(hoursToMillis(20));      //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
@@ -242,7 +251,8 @@ void setup() {
   server.on("/SetTimes",handle_SetTimes);
   server.on("/settings",handle_settings);
   server.on("/pumpOn",handle_pumpOn);
-  server.on("/pumpOff",handle_pumpOff);
+  server.on("/pumpOff", handle_pumpOff);
+  server.on("/topfan", handle_topFan);
   server.begin();
   Serial.println("HTTP server started");
 
@@ -269,14 +279,14 @@ void startup() {
 
     Serial.println("Turning Light1 On");
     digitalWrite(light1Pin, HIGH);    // Turning Light 1 ON
-    light1RelayState=HIGH;
+    relayState.light1 = HIGH;
 
   }
   if ((cda.hour() >= light2On.substring(0, 2).toInt()) && (cda.hour() < light2Off.substring(0, 2).toInt())) {
 
     Serial.println("Turning Light2 On");
     digitalWrite(light2Pin, HIGH);    // Turning Light 2 ON
-    light2RelayState=HIGH;
+    relayState.light2 = HIGH;
     pump();     //Lights are on, start the misting sequence
     topFan();  //Starts top fan
 
@@ -342,7 +352,7 @@ void loop() {
     topFan();
   }
 
-  if ((manFilling == true) && (manualFillMetro.check() == 1) && (roRelayState == HIGH)) {
+  if ((manFilling == true) && (manualFillMetro.check() == 1) && (relayState.ro == HIGH)) {
     Serial.println("Manual Filling Timed event");
     stopRO();
     manFilling=false;
@@ -375,31 +385,36 @@ float GetTemp() {
 }
 
 void pump() {
-  if (pumpState == LOW) {
-    pumpState = HIGH;
+  if (relayState.pump == LOW) {
+    relayState.pump = HIGH;
     Serial.println("Pumping");
+    pumpMetro.reset();
     pumpMetro.interval(secondsToMillis(pumpTime));
   }
   else {
-    pumpState = LOW;
+    relayState.pump = LOW;
     Serial.println("Stopping pump");
-    if ((light1RelayState==LOW) && (light2RelayState==LOW)) {
+    if ((relayState.light1 == LOW) && (relayState.light2 == LOW)) {
+      pumpMetro.reset();
       pumpMetro.interval(hoursToMillis(23));        // Stop the pump untill the next time Light and 2 are turned on
     }
     else {
+      pumpMetro.reset();
       pumpMetro.interval(minutesToMillis(pumpFreq));
     }
     
   }
-  digitalWrite(pumpPin, pumpState);
-  //digitalWrite(ledPin,pumpState);
+  digitalWrite(pumpPin, relayState.pump);
+  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));    // If a Web client is connected, refresh the page to update the button state
+ 
 }
 
 void stopRO() {
   Serial.println("Stopping RO");
   updateDisplay("Stopping RO");
-  digitalWrite(roPin, LOW);
-  roRelayState = LOW;
+  relayState.ro = LOW;
+  digitalWrite(roPin, relayState.ro);
+  
 }
 
 void checkRO() {
@@ -408,29 +423,30 @@ void checkRO() {
   fullRO = digitalRead(fullROpin);
   //Serial.print("Full RO = ");
   //Serial.println(fullRO);
-  if ((roRelayState == LOW) && (fullRO == HIGH) && (t==0)) {
+  if ((relayState.ro == LOW) && (fullRO == HIGH) && (t==0)) {
     Serial.println("Not filling , Not Full");
        if (t==0){
           t=millis();
        }
     }
-   else if ((roRelayState == LOW) && (fullRO == HIGH) &&((millis()-t)>3000)) {              //Debounce switch 
+   else if ((relayState.ro == LOW) && (fullRO == HIGH) &&((millis()-t)>3000)) {              //Debounce switch 
     Serial.println((millis()-t));
     Serial.print("Ro Relay State :");
-    Serial.println(roRelayState);
+    Serial.println(relayState.ro);
     
     Serial.println("Starting to fill....");
     updateDisplay("Starting to fill RO");
-    digitalWrite(roPin, HIGH);
-    roRelayState=HIGH;
+    relayState.ro = HIGH;
+    digitalWrite(roPin, relayState.ro);
+    
     }
-   else if ((roRelayState == HIGH) && (fullRO == LOW)) {
+   else if ((relayState.ro == HIGH) && (fullRO == LOW)) {
     Serial.println("Filling , Full");
     Serial.println("Stop filling....");
     updateDisplay("Stop filling RO");
-    digitalWrite(roPin, LOW);
-    roRelayState = LOW;
-    t=0;
+    relayState.ro = LOW;
+    digitalWrite(roPin, relayState.ro);
+    t=0;              // reset t for next occurence
     }
     else {
       //Serial.println("RO Is full");
@@ -447,12 +463,12 @@ void checkRO() {
 
 void manualFill(uint8_t T) {
   Serial.println("Manual Fill called");
-  if (roRelayState == LOW) {
+  if (relayState.ro == LOW) {
       manualFillMetro.reset();
       manualFillMetro.interval(minutesToMillis(T));
       digitalWrite(roPin, HIGH);
-      roRelayState = HIGH;
-      manFilling=true;
+      relayState.ro = HIGH;
+      manFilling = true;
       
     
   }
@@ -467,12 +483,12 @@ void manualFill(uint8_t T) {
 
 void switchLight1(uint8_t state) {
    digitalWrite(light1Pin, state);
-   light1RelayState=state;
+   relayState.light1=state;
 }
 
 void switchLight2(uint8_t state) {
    digitalWrite(light2Pin, state);
-   light2RelayState=state;
+   relayState.light2=state;
 }
 
 /*
@@ -555,25 +571,28 @@ void updateDisplay(String msg) {
 
 void topFan() {
   String msg;
-  if (topFanState == LOW) {
-    topFanState = HIGH;
+  if (relayState.topFan  == LOW) {
+    topFanMetro.reset();
+    topFanMetro.interval(minutesToMillis(fanTime));
+    relayState.topFan = HIGH;
     msg="Starting Top Fan for ";
     msg += fanTime;
     msg += " minutes";
     Serial.println(msg);
-    topFanMetro.interval(minutesToMillis(fanTime));
     updateDisplay(msg);
   }
   else {
+    topFanMetro.reset();
+    topFanMetro.interval(minutesToMillis(fanFreq));
     msg = "Pausing Top Fan for";
     msg += fanFreq;
     msg += " minutes";
-    topFanState = LOW;
+    relayState.topFan = LOW;
     Serial.println(msg);
     updateDisplay(msg);
-    topFanMetro.interval(minutesToMillis(fanFreq));
+    
   }
-  digitalWrite(topFanPin, topFanState);
+  digitalWrite(topFanPin, relayState.topFan);
 
 }
 
@@ -594,6 +613,7 @@ void timedEvents(String curTime) {
     Serial.println("Turn Light2 ON");
     switchLight2(HIGH);
     //pump();
+    pumpMetro.reset();
     pumpMetro.interval(secondsToMillis(10));    //pump will run 10 seconds after light are turned on
 
   }
@@ -655,29 +675,18 @@ void timedEvents(String curTime) {
 void checkhttpclient() {
 
   server.handleClient();
-  /*
-    if(light1RelayState)
-    {digitalWrite(light1pin, HIGH);}
-    else
-    {digitalWrite(light1pin, LOW);}
-
-    if(light2RelayState)
-    {digitalWrite(light2pin, HIGH);}
-    else
-    {digitalWrite(light2pin, LOW);}
-  */
-
-  digitalWrite(light1Pin, light1RelayState);
-  digitalWrite(light2Pin, light2RelayState);
-//  digitalWrite(nightLightPin, nightLightRelayState);
-  digitalWrite(roPin, roRelayState);
+  
+  digitalWrite(light1Pin, relayState.light1 );
+  digitalWrite(light2Pin, relayState.light2 );
+  digitalWrite(topFanPin, relayState.topFan );
+  digitalWrite(roPin, relayState.ro );
 }
 
 void handle_OnConnect() {
   //LED1status = LOW;
   //LED2status = LOW;
 
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime,GetTemp(),pumpState));
+  server.send(200, "text/html", sendMainHTML(relayState,  manfillTime,GetTemp()));
 }
 
 void handle_light1on() {
@@ -685,7 +694,7 @@ void handle_light1on() {
   Serial.println("Light1 Status: ON");
   updateDisplay("Manually turning Light 1 ON");
   switchLight1(HIGH);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime,GetTemp(),pumpState));
+  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
 }
 
 void handle_light1off() {
@@ -693,7 +702,7 @@ void handle_light1off() {
   Serial.println("Light1 Status: OFF");
   updateDisplay("Manually turning Light 1 OFF");
   switchLight1(LOW);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime,GetTemp(),pumpState));
+  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
 }
 
 void handle_light2on() {
@@ -701,7 +710,7 @@ void handle_light2on() {
   Serial.println("Light2 Status: ON");
   updateDisplay("Manually turning Light 2 ON");
   switchLight2(HIGH);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime,GetTemp(),pumpState));
+  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
 }
 
 void handle_light2off() {
@@ -709,7 +718,7 @@ void handle_light2off() {
   Serial.println("Light2 Status: OFF");
   updateDisplay("Manually turning Light 2 OFF");
   switchLight2(LOW);
-  server.send(200, "text/html", sendMainHTML(light1RelayState,light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
+  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
 }
 /*
 void handle_nightlightoff() {
@@ -736,13 +745,13 @@ void handle_FillRO() {
   
     manfillTime = server.arg("filltime").toInt();
     Serial.println(manfillTime);
-     String msg = "Manually Filling RO for ";
+    String msg = "Manually Filling RO for ";
     msg += manfillTime;
     msg += " minutes";
     updateDisplay(msg);
     Serial.println(msg);
     manualFill(manfillTime);
-    server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
   
   
 }
@@ -756,28 +765,36 @@ void handle_SetTimes() {
   nightLightOff=server.arg("nlightstop");
   pumpFreq=server.arg("pumpfreq").toInt();
   pumpTime=server.arg("pumplen").toInt();
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
+  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
 }
 
 void handle_pumpOn() {
-  pumpState = HIGH;
+  //pumpState = HIGH;
   Serial.println("Manually Pumping");
-  digitalWrite(pumpPin, pumpState);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
+  //digitalWrite(pumpPin, pumpState);
+  pump();
+  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
 }
 
 void handle_pumpOff() {
-  pumpState = LOW;
-  Serial.println("Stoping Pump");
-  digitalWrite(pumpPin, pumpState);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
+  //pumpState = LOW;
+  Serial.println("Manually Stoping Pump");
+  //digitalWrite(pumpPin, pumpState);
+  pump();
+  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
 }
 
 void handle_settings() {
   server.send(200,"text/html",sendSettingsHTML(pumpFreq,pumpTime,fanTime,fanFreq, light1On, light1Off, light2On, light2Off, nightLightOn, nightLightOff));
 }
 
-String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat, uint8_t rostat,  uint8_t mf ,float temp,uint8_t pumpstate) {
+void handle_topFan() {
+    topFan();
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+}
+
+
+String sendMainHTML(relayState_t relSt ,uint8 mfillTime,float temp) {
   String ptr = "<!DOCTYPE html> <html>\n"; 
   ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
   ptr += "<title>Terrarium Control</title>\n";
@@ -788,6 +805,7 @@ String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat
   ptr += ".button-on:active {background-color: #16a085;}\n";
   ptr += ".button-off {background-color: #34495e;}\n";
   ptr += ".button-off:active {background-color: #2c3e50;}\n";
+  ptr += "input[type=submit] {background-color: #1abc9c; border: none; color: white; padding: 13px 30px; text-decoration: none; font-size: 25px; margin: 4px 2px; cursor: pointer;}\n";
   ptr += "p {font-size: 14px;color: #888;margin-bottom: 10px;}\n";
   ptr += "</style>\n";
   ptr += "</head>\n";
@@ -799,7 +817,7 @@ String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat
   ptr += "<p>Temperature: ";
   ptr += temp;
   ptr += "C</p>";
-  if (light1stat)
+  if (relSt.light1 )
   {
     ptr += "<p>Light1 Status: ON</p><a class=\"button button-off\" href=\"/light1off\">OFF</a>\n";
   }
@@ -808,7 +826,7 @@ String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat
     ptr += "<p>Light1 Status: OFF</p><a class=\"button button-on\" href=\"/light1on\">ON</a>\n";
   }
 
-  if (light2stat)
+  if (relSt.light2)
   {
     ptr += "<p>Light2 Status: ON</p><a class=\"button button-off\" href=\"/light2off\">OFF</a>\n";
   }
@@ -816,7 +834,15 @@ String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat
   {
     ptr += "<p>Light2 Status: OFF</p><a class=\"button button-on\" href=\"/light2on\">ON</a>\n";
   }
-
+  if (relSt.topFan )
+  {
+      ptr += "<p>Top Fan Status: ON</p><a class=\"button button-off\" href=\"/topfan\">OFF</a>\n";
+  }
+  else
+  {
+      ptr += "<p>Top Fan Status: OFF</p><a class=\"button button-on\" href=\"/topfan\">ON</a>\n";
+  }
+  /*
   if (nitelitestat)
   {
     ptr += "<p>Night Light Status: ON</p><a class=\"button button-off\" href=\"/nightlightoff\">OFF</a>\n";
@@ -825,7 +851,8 @@ String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat
   {
     ptr += "<p>Night Light Status: OFF</p><a class=\"button button-on\" href=\"/nightlighton\">ON</a>\n";
   }
-  if (pumpstate==LOW) {
+  */
+  if (relSt.pump == LOW) {
     ptr += "<p>Water Misting</p><a class=\"button button-on\" href=\"/pumpOn\">Start</a>\n";
   }
   else {
@@ -835,9 +862,9 @@ String sendMainHTML(uint8_t light1stat, uint8_t light2stat, uint8_t nitelitestat
   ptr += "<form action=/FillRO>";
   ptr += "<label for=fname>Number of minutes to fill</label><br>";
   ptr += "<input type=number id=filltime name=filltime value=";
-  ptr += mf;
+  ptr += mfillTime;
   ptr += "><br>";
-  if (rostat==LOW)
+  if (relSt.ro == LOW)
   {
   ptr += "<input type=submit value=Fill><br><br>";
   }
