@@ -11,7 +11,7 @@
 
 #include <Metro.h>
 
-String appVers ="Version 1.7.3";
+String appVers ="Version 1.7.4";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4    
@@ -47,7 +47,7 @@ OneWire ow(tempPin);
 DallasTemperature tempSensor(&ow);
 //**********************  ezTime stuff ***********************
 Timezone cda;
-const long utcOffsetInSeconds = -18000;           // Offset for the Timezone
+//const long utcOffsetInSeconds = -18000;           // Offset for the Timezone
 //*******************  Wi-Fi info ************************
 //const char* ssid = "whipet";  // Enter SSID here
 char ssid[] = "whipet";
@@ -67,7 +67,7 @@ uint8_t pumpFreq = 180;         //Pump frequency in minutes
 uint8_t pumpTime = 10;          //Number of seconds to run the pump
 uint8_t fanTime = 10;           //Number of minutes to run the fan
 uint8_t fanFreq = 45;           //Fan frequency in minutes
-char token[] = "vRYJMQpRDKhEWmpShmRxQ0jHGX1kzGGz";
+//char token[] = "vRYJMQpRDKhEWmpShmRxQ0jHGX1kzGGz";
 // ****************  recurring events ****************
 Metro pumpMetro ;         //
 Metro displayMetro ;
@@ -92,7 +92,7 @@ int light2RelayState = LOW;
 int nightLightRelayState = LOW;
 int roRelayState = LOW;
 */
-uint8_t manfillTime = 11;   //Nuber of minutes to manually fill RO bottles
+uint8_t manfillTime = 20;   //Nuber of minutes to manually fill RO bottles
 uint8_t fullRO;                //Level of RO supply
 bool manFilling = false;
 
@@ -212,6 +212,7 @@ void setup() {
   display.println(ssid);
   display.display();
   //connect to your local wi-fi network
+  WiFi.hostname("Dendrobates");
   WiFi.begin(ssid, password);
   
   //check wi-fi is connected to wi-fi network
@@ -235,7 +236,7 @@ void setup() {
   display.display();
   delay(3000);
 
-  cda.setPosix("EST5EDT,M3.5.0,M10.5.0");     //Sets timezone to GMT+5, aka here
+  cda.setPosix("EST5EDT,M3.2.0,M11.1.0");     //Sets timezone to GMT+5, aka here
   Serial.println(cda.dateTime());             //Prints datetime
   Serial.println(cda.dateTime("H:i"));        //Prints Time in HH:MM format . This is how we will compare timed events
   startup();
@@ -621,6 +622,8 @@ void timedEvents(String curTime) {
     updateDisplay("Turn Light1 Off");
     Serial.println("Turn Light1 Off & Night Light On");
     switchLight1(LOW);
+    digitalWrite(topFanPin, LOW);
+    topFanMetro.reset();
     topFanMetro.interval(hoursToMillis(23));       //stops top fan for the night
     pumpMetro.interval(hoursToMillis(23));         // stops pumpEvents for the night
   }
