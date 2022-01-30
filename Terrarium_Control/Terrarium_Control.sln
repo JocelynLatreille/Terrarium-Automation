@@ -5,6 +5,10 @@ VisualStudioVersion = 16.0.31019.35
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Terrarium_Control", "Terrarium_Control.vcxproj", "{C5F80730-F44F-4478-BDAE-6634EFC2CA88}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SHT31test", "..\..\..\Arduino\My Examples\SHT31test\SHT31test.vcxproj", "{E0A67A8A-B7A5-4DFE-AC5B-2C753C789501}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "i2c_address_detect", "..\..\..\Arduino\My Examples\i2c_address_detect\i2c_address_detect.vcxproj", "{6803CC31-9F01-459D-ACE3-ACB80F75272E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x86 = Debug|x86
@@ -15,6 +19,14 @@ Global
 		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.Build.0 = Debug|Win32
 		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.ActiveCfg = Release|Win32
 		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.Build.0 = Release|Win32
+		{E0A67A8A-B7A5-4DFE-AC5B-2C753C789501}.Debug|x86.ActiveCfg = Debug|Win32
+		{E0A67A8A-B7A5-4DFE-AC5B-2C753C789501}.Debug|x86.Build.0 = Debug|Win32
+		{E0A67A8A-B7A5-4DFE-AC5B-2C753C789501}.Release|x86.ActiveCfg = Release|Win32
+		{E0A67A8A-B7A5-4DFE-AC5B-2C753C789501}.Release|x86.Build.0 = Release|Win32
+		{6803CC31-9F01-459D-ACE3-ACB80F75272E}.Debug|x86.ActiveCfg = Debug|Win32
+		{6803CC31-9F01-459D-ACE3-ACB80F75272E}.Debug|x86.Build.0 = Debug|Win32
+		{6803CC31-9F01-459D-ACE3-ACB80F75272E}.Release|x86.ActiveCfg = Release|Win32
+		{6803CC31-9F01-459D-ACE3-ACB80F75272E}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
