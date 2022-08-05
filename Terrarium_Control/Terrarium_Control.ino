@@ -11,7 +11,7 @@
 #include "Logo.h"
 #include <Metro.h>
 
-String appVers ="Version 1.7.6";
+String appVers ="Version 1.7.7";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4    
@@ -50,9 +50,14 @@ Timezone cda;
 //const long utcOffsetInSeconds = -18000;           // Offset for the Timezone
 //*******************  Wi-Fi info ************************
 //const char* ssid = "whipet";  // Enter SSID here
-char ssid[] = "whipet";
+char ssid[] = "Whipet 2.4";
 //const char* password = "b1gb00b5";  //Enter Password here
-char password[] = "b1gb00b5";
+char password[] = "pastelbird150";
+// Set your Static IP address
+IPAddress local_IP(10, 0, 0, 82);
+// Set your Gateway IP address
+IPAddress gateway(10, 0, 0, 1);
+IPAddress subnet(255, 255, 255, 0);
 ESP8266WebServer server(80);
 //***********************  Timed events schedule  ************************
 //Zoomed Light = Light   Sunblaster Light = light2
@@ -69,7 +74,7 @@ uint8_t fanTime = 10;           //Number of minutes to run the fan
 uint8_t fanFreq = 45;           //Fan frequency in minutes
 //char token[] = "vRYJMQpRDKhEWmpShmRxQ0jHGX1kzGGz";
 // ****************  recurring events ****************
-Metro pumpMetro ;         //
+Metro sprayMetro ;         //
 Metro displayMetro ;
 //Metro fanMetro ;
 Metro checkCurTime ;      // Event to check the current time and act on any timed event
@@ -133,7 +138,7 @@ void setup() {
 
  
   //************************ Set recurring events  ********************
-  pumpMetro.interval(hoursToMillis(20));        //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
+  sprayMetro.interval(hoursToMillis(20));        //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
   topFanMetro.interval(hoursToMillis(20));      //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
   checkCurTime.interval(secondsToMillis(timeCheckInterval));   //Check current time for any sceduled events
   manualFillMetro.interval(hoursToMillis(20));        //Set to a ridiculously long delay .
@@ -146,9 +151,12 @@ void setup() {
   Serial.println(ssid);
   display.println(ssid);
   display.display();
+  
   //connect to your local wi-fi network
   WiFi.hostname("Dendrobates");
   WiFi.begin(ssid, password);
+  
+  
   
   //check wi-fi is connected to wi-fi network
   while (WiFi.status() != WL_CONNECTED) {
@@ -223,7 +231,7 @@ void startup() {
     Serial.println("Turning Light2 On");
     digitalWrite(light2Pin, HIGH);    // Turning Light 2 ON
     relayState.light2 = HIGH;
-    pump();     //Lights are on, start the misting sequence
+    spray();     //Lights are on, start the misting sequence
     topFan();  //Starts top fan
 
 
@@ -276,11 +284,12 @@ void loop() {
     lastTime=cda.dateTime("H:i");
     Serial.println("timed event");
     timedEvents(cda.dateTime("H:i"));
+    
   }
 
-  if (pumpMetro.check() == 1) {
+  if (sprayMetro.check() == 1) {
     Serial.println("Pump Event");
-    pump();
+    spray();
   }
 
   if (topFanMetro.check() == 1) {
@@ -320,23 +329,23 @@ float GetTemp() {
   */
 }
 
-void pump() {
+void spray() {
   if (relayState.pump == LOW) {
     relayState.pump = HIGH;
     Serial.println("Pumping");
-    pumpMetro.reset();
-    pumpMetro.interval(secondsToMillis(pumpTime));
+    sprayMetro.reset();
+    sprayMetro.interval(secondsToMillis(pumpTime));
   }
   else {
     relayState.pump = LOW;
     Serial.println("Stopping pump");
     if ((relayState.light1 == LOW) && (relayState.light2 == LOW)) {
-      pumpMetro.reset();
-      pumpMetro.interval(hoursToMillis(23));        // Stop the pump untill the next time Light and 2 are turned on
+      sprayMetro.reset();
+      sprayMetro.interval(hoursToMillis(23));        // Stop the pump untill the next time Light and 2 are turned on
     }
     else {
-      pumpMetro.reset();
-      pumpMetro.interval(minutesToMillis(pumpFreq));
+      sprayMetro.reset();
+      sprayMetro.interval(minutesToMillis(pumpFreq));
     }
     
   }
@@ -549,8 +558,8 @@ void timedEvents(String curTime) {
     Serial.println("Turn Light2 ON");
     switchLight2(HIGH);
     //pump();
-    pumpMetro.reset();
-    pumpMetro.interval(secondsToMillis(10));    //pump will run 10 seconds after light are turned on
+    sprayMetro.reset();
+    sprayMetro.interval(secondsToMillis(10));    //pump will run 10 seconds after light are turned on
 
   }
   else if (curTime == light1Off) {
@@ -564,8 +573,8 @@ void timedEvents(String curTime) {
     
     topFanMetro.reset();
     topFanMetro.interval(hoursToMillis(23));       //stops top fan for the night
-    pumpMetro.reset();
-    pumpMetro.interval(hoursToMillis(23));         // stops pumpEvents for the night
+    sprayMetro.reset();
+    sprayMetro.interval(hoursToMillis(23));         // stops pumpEvents for the night
   }
   else if (curTime == light2Off) {
     updateDisplay("Turn Light2 Off");
@@ -715,7 +724,7 @@ void handle_pumpOn() {
   //pumpState = HIGH;
   Serial.println("Manually Pumping");
   //digitalWrite(pumpPin, pumpState);
-  pump();
+  spray();
   server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
 }
 
@@ -723,7 +732,7 @@ void handle_pumpOff() {
   //pumpState = LOW;
   Serial.println("Manually Stoping Pump");
   //digitalWrite(pumpPin, pumpState);
-  pump();
+  spray();
   server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
 }
 
