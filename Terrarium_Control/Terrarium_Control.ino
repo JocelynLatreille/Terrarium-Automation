@@ -1,6 +1,5 @@
-#include <DallasTemperature.h>
-#include <OneWire.h>
 
+#include <SHT31.h>
 #include <ezTime.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -11,7 +10,7 @@
 #include "Logo.h"
 #include <Metro.h>
 
-String appVers ="Version 1.7.7";
+String appVers ="Version 1.7.8";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4    
@@ -43,15 +42,12 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
   #define topFanInterval 45   // Interval for top ventilation fan
 */
 //**********************  Temperature Sensor variables  ***************
-OneWire ow(tempPin);
-DallasTemperature tempSensor(&ow);
+SHT31 sht;
 //**********************  ezTime stuff ***********************
 Timezone cda;
-//const long utcOffsetInSeconds = -18000;           // Offset for the Timezone
+
 //*******************  Wi-Fi info ************************
-//const char* ssid = "whipet";  // Enter SSID here
 char ssid[] = "Whipet 2.4";
-//const char* password = "b1gb00b5";  //Enter Password here
 char password[] = "pastelbird150";
 // Set your Static IP address
 IPAddress local_IP(10, 0, 0, 82);
@@ -179,6 +175,10 @@ void setup() {
   display.display();
   delay(3000);
 
+  Wire.begin();
+  sht.begin(0x44);
+
+
   cda.setPosix("EST5EDT,M3.2.0,M11.1.0");     //Sets timezone to GMT+5, aka here
   Serial.println(cda.dateTime());             //Prints datetime
   Serial.println(cda.dateTime("H:i"));        //Prints Time in HH:MM format . This is how we will compare timed events
@@ -200,7 +200,7 @@ void setup() {
   server.begin();
   Serial.println("HTTP server started");
 
-  tempSensor.begin();
+  
   manFilling = false;
 }
 
@@ -306,28 +306,17 @@ void loop() {
     //Serial.println("Checking RO");
     checkRO();
   }
-  /*
-    The relay I used somehow seem to be triggered by a lOW pin, and not a hHIG|h one
-    somehow....
-    
-
-    if (fogMetro.check() == 1) {
-    Serial.println("Fogger event");
-    fogger();
-    }
-  */
+  sht.read();
   checkhttpclient();
   
 }
+float GetHumidity() {
+    return sht.getHumidity();
+}
 
 float GetTemp() {
-  
-  tempSensor.requestTemperatures();
-  return tempSensor.getTempCByIndex(0);
-  /*
-  return 37.99;
-  */
-}
+    return sht.getTemperature();
+ }
 
 void spray() {
   if (relayState.pump == LOW) {
@@ -478,6 +467,14 @@ void updateDisplay(String msg) {
         disp +=1;
         break;
       case 3:
+        display.setCursor(0, 14);
+        display.setTextSize(3);
+        display.print(GetHumidity());
+        display.println("%");     //ASCII Degree symbol
+        //display.println("");
+        disp += 1;
+        break;
+      case 4:
         display.setCursor(0,0);
         display.setTextSize(2);
         display.println("Terrarium");
