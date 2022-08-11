@@ -119,5 +119,7 @@ typedef long __PTRDIFF_TYPE__;
 #define noInterrupts() cli()
 
 #include "Terrarium_Control.ino"
+#include "HTML_Stuff.ino"
+#include "Wifi.ino"
 #endif
 #endif

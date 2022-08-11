@@ -16,6 +16,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Terrarium_Control.ino" />
+    <None Include="HTML_Stuff.ino" />
+    <None Include="Wifi.ino" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="__vm\.Terrarium_Control.vsarduino.h">
