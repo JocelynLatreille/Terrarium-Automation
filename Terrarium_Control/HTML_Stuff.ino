@@ -1,6 +1,6 @@
 
 
-String sendMainHTML(relayState_t relSt, uint8 mfillTime, float temp,float Humidity) {
+String sendMainHTML(struct relayState_t relSt, uint8_t mfillTime, float temp,float Humidity) {
     String ptr = "<!DOCTYPE html> <html>\n";
     ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
     ptr += "<title>Terrarium Control</title>\n";
@@ -149,5 +149,3 @@ String sendSettingsHTML(uint8_t pumpfreq, uint8_t pumpLen, uint8_t fanLen, uint8
     ptr += "</html>\n";
     return ptr;
 }
-
-

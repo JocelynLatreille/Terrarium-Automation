@@ -8,6 +8,7 @@
 #include <Adafruit_SSD1306.h>
 #include "Logo.h"
 #include <Metro.h>
+#include <Espalexa.h>
 
 String appVers ="Version 1.7.8";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
@@ -30,16 +31,6 @@ String appVers ="Version 1.7.8";
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 ESP8266WebServer server(80);
 
-//#define ledPin 13
-// *************************************************************************************************************************
-/*
-  #define pumpTime 10000           //Number of seconds to spray
-  #define fogInterval 3600000        //Number of hours between each fogging
-  #define fogTime 1800000            //Number of seconds to let the fogger run
-  #define timeCheck 30              // interval to check the time
-  #define nightInterval 43200000‬
-  #define topFanInterval 45   // Interval for top ventilation fan
-*/
 //**********************  Temperature Sensor variables  ***************
 SHT31 sht;
 //**********************  ezTime stuff ***********************
@@ -47,7 +38,37 @@ Timezone cda;
 //*******************  Wi-Fi info ************************
 char ssid[] = "Whipet 2.4";
 char password[] = "pastelbird150";
+//***********************************************************************
 
+//******************************Alexa callback Functions and Object declaration ******************
+void lightChange(uint8_t OnOff);
+void pumpChange(uint8_t OnOff);
+Espalexa espalexa;
+
+void lightChange(uint8_t OnOff)
+{
+  if(OnOff ==255)
+  {
+    switchLight1(HIGH);
+    switchLight2(HIGH);
+  }
+  else
+  {
+    switchLight1(LOW);
+    switchLight2(LOW);
+  }
+}
+
+void pumpChange(uint8_t OnOff)
+{
+  spray();
+}
+
+void addAlexaDevices() {
+  espalexa.addDevice("Lumieres Terrarium",lightChange);
+  espalexa.addDevice("Pompe Terrarium",pumpChange);
+}
+//*************************************************************************
 //***********************  Timed events schedule  ************************
 //Zoomed Light = Light   Sunblaster Light = light2
 //NightLight is the Zoomed blue Leds
@@ -143,6 +164,7 @@ void setup() {
   display.println(ssid);
   display.display();
   
+  addAlexaDevices();
   
   waitForSync();
   display.clearDisplay();
@@ -157,6 +179,8 @@ void setup() {
   display.println(WiFi.localIP());
   display.display();
   delay(3000);
+
+
 
   Wire.begin();
   sht.begin(0x44);
@@ -186,6 +210,7 @@ void setup() {
   
   manFilling = false;
 }
+
 
 void startup() {
   // This sub is called once during setup, to initialize anything based on the schedule after power up
@@ -322,7 +347,7 @@ void spray() {
     
   }
   digitalWrite(pumpPin, relayState.pump);
-  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));    // If a Web client is connected, refresh the page to update the button state
+  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));    // If a Web client is connected, refresh the page to update the button state
  
 }
 
@@ -573,38 +598,6 @@ void timedEvents(String curTime) {
   */
 }
 
-/*
-  void PulseFan() {
-  const int speedSteps = 5;
-  static bool goingUp = true;
-  static int x;
-  int fanSpeed;
-
-  if (goingUp == true  && x == 100) {
-    goingUp = !goingUp;
-    x = x - speedSteps;
-  }
-  else if (goingUp == true && x < 100) {
-    x = x + speedSteps;
-  }
-  else if (goingUp == false && x == 0) {
-    goingUp = !goingUp;
-    x = x + speedSteps;
-  }
-  else {
-    x = x - speedSteps;
-  }
-  Serial.println("Pulsing Fan");
-  Serial.println(x);
-  fanSpeed = map(x, 0, 100, 101, 200);
-
-
-  analogWrite(fanPin, fanSpeed);
-
-
-  }
-*/
-
 unsigned long secondsToMillis(unsigned long sec) {
   return sec * 1000;
 }
@@ -632,7 +625,7 @@ void handle_OnConnect() {
     //LED1status = LOW;
     //LED2status = LOW;
 
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 }
 
 void handle_light1on() {
@@ -640,7 +633,7 @@ void handle_light1on() {
     Serial.println("Light1 Status: ON");
     updateDisplay("Manually turning Light 1 ON");
     switchLight1(HIGH);
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 }
 
 void handle_light1off() {
@@ -648,7 +641,7 @@ void handle_light1off() {
     Serial.println("Light1 Status: OFF");
     updateDisplay("Manually turning Light 1 OFF");
     switchLight1(LOW);
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 }
 
 void handle_light2on() {
@@ -656,7 +649,7 @@ void handle_light2on() {
     Serial.println("Light2 Status: ON");
     updateDisplay("Manually turning Light 2 ON");
     switchLight2(HIGH);
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 }
 
 void handle_light2off() {
@@ -664,7 +657,7 @@ void handle_light2off() {
     Serial.println("Light2 Status: OFF");
     updateDisplay("Manually turning Light 2 OFF");
     switchLight2(LOW);
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 }
 /*
 void handle_nightlightoff() {
@@ -697,7 +690,7 @@ void handle_FillRO() {
     updateDisplay(msg);
     Serial.println(msg);
     manualFill(manfillTime);
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 
 
 }
@@ -711,7 +704,7 @@ void handle_SetTimes() {
     nightLightOff = server.arg("nlightstop");
     pumpFreq = server.arg("pumpfreq").toInt();
     pumpTime = server.arg("pumplen").toInt();
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 }
 
 void handle_pumpOn() {
@@ -719,7 +712,7 @@ void handle_pumpOn() {
     Serial.println("Manually Pumping");
     //digitalWrite(pumpPin, pumpState);
     spray();
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 }
 
 void handle_pumpOff() {
@@ -727,7 +720,7 @@ void handle_pumpOff() {
     Serial.println("Manually Stoping Pump");
     //digitalWrite(pumpPin, pumpState);
     spray();
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 }
 
 void handle_settings() {
@@ -736,5 +729,6 @@ void handle_settings() {
 
 void handle_topFan() {
     topFan();
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp()));
+    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 }
+
