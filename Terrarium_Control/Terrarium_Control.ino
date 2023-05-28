@@ -1,8 +1,7 @@
+#include <ESP8266WebServer.h>
 
 #include <SHT31.h>
 #include <ezTime.h>
-#include <ESP8266WebServer.h>
-
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -10,7 +9,7 @@
 #include <Metro.h>
 
 
-String appVers ="Version 1.7.9";
+String appVers ="Version 1.7.9-a";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4    
@@ -36,22 +35,6 @@ SHT31 sht;
 //**********************  ezTime stuff ***********************
 Timezone cda;
 
-
-
-//***********************  Timed events schedule  ************************
-//Zoomed Light = Light   Sunblaster Light = light2
-//NightLight is the Zoomed blue Leds
-String light1On = "08:00";
-String light1Off = "20:55";
-String light2On = "08:10";
-String light2Off = "21:00";
-//String nightLightOn = "21:00";
-//String nightLightOff = "23:45";
-uint8_t pumpFreq = 180;         //Pump frequency in minutes
-uint8_t pumpTime = 10;          //Number of seconds to run the pump
-uint8_t fanTime = 10;           //Number of minutes to run the fan
-uint8_t fanFreq = 45;           //Fan frequency in minutes
-//char token[] = "vRYJMQpRDKhEWmpShmRxQ0jHGX1kzGGz";
 // ****************  recurring events ****************
 Metro sprayMetro ;         //
 Metro displayMetro ;
@@ -77,28 +60,30 @@ struct settings_t {
   String light1_Off;
   String light2_On;
   String light2_Off;
-} appSetting;
-/*
-int pumpState = LOW;
-//int fogState = LOW;               //No need for a fan state as it will run at the same time as the fan
-int topFanState = LOW;            //Top ventilation fan
-int light1RelayState = LOW;
-int light2RelayState = LOW;
-int nightLightRelayState = LOW;
-int roRelayState = LOW;
-*/
+} appSettings;
+
 uint8_t manfillTime = 20;   //Nuber of minutes to manually fill RO bottles
 uint8_t fullRO;                //Level of RO supply
 bool manFilling = false;
 
-// 'images', 128x64px
+void Init_AppValues() {
 
-
+    appSettings.light1_On = "08:00";
+    appSettings.light1_Off = "20:55";
+    appSettings.light2_On = "08:10";
+    appSettings.light2_Off = "21:00";
+    appSettings.pumpFrequency = 180;
+    appSettings.pumpDuration = 10;
+    appSettings.fanFrequency = 45;
+    appSettings.fanDuration = 10;
+}
 
 void setup() {
     
   Serial.begin(115200);
   while (!Serial);
+  Init_AppValues();
+  
 
    //************************  Set Pins  **************************
   pinMode(light1Pin, OUTPUT);
@@ -153,22 +138,7 @@ void setup() {
   Serial.println(cda.dateTime());             //Prints datetime
   Serial.println(cda.dateTime("H:i"));        //Prints Time in HH:MM format . This is how we will compare timed events
   startup();
-  // ******************************  Initialize Web Server and web events ******************************
-  server.on("/", handle_OnConnect);
-  server.on("/light1on", handle_light1on);
-  server.on("/light1off", handle_light1off);
-  server.on("/light2on", handle_light2on);
-  server.on("/light2off", handle_light2off);
- // server.on("/nightlighton",handle_nightlighton);
- // server.on("/nightlightoff",handle_nightlightoff);
-  server.on("/FillRO", handle_FillRO);
-  server.on("/SetTimes",handle_SetTimes);
-  server.on("/settings",handle_settings);
-  server.on("/pumpOn",handle_pumpOn);
-  server.on("/pumpOff", handle_pumpOff);
-  server.on("/topfan", handle_topFan);
-  server.begin();
-  Serial.println("HTTP server started");
+ 
 
   
   manFilling = false;
@@ -189,14 +159,14 @@ void startup() {
     Serial.print("Light1 Minute:");
     Serial.println(light1On.substring(3, 5));
   */
-  if (cda.hour() >= light1On.substring(0, 2).toInt() && cda.hour() < light1Off.substring(0, 2).toInt()) {
+  if (cda.hour() >= appSettings.light1_On.substring(0, 2).toInt() && cda.hour() < appSettings.light1_Off.substring(0, 2).toInt()) {
 
     Serial.println("Turning Light1 On");
     digitalWrite(light1Pin, HIGH);    // Turning Light 1 ON
     relayState.light1 = HIGH;
 
   }
-  if ((cda.hour() >= light2On.substring(0, 2).toInt()) && (cda.hour() < light2Off.substring(0, 2).toInt())) {
+  if ((cda.hour() >= appSettings.light2_On.substring(0, 2).toInt()) && (cda.hour() < appSettings.light2_Off.substring(0, 2).toInt())) {
 
     Serial.println("Turning Light2 On");
     digitalWrite(light2Pin, HIGH);    // Turning Light 2 ON
@@ -294,7 +264,7 @@ void spray() {
     relayState.pump = HIGH;
     Serial.println("Pumping");
     sprayMetro.reset();
-    sprayMetro.interval(secondsToMillis(pumpTime));
+    sprayMetro.interval(secondsToMillis(appSettings.pumpDuration));
   }
   else {
     relayState.pump = LOW;
@@ -305,7 +275,7 @@ void spray() {
     }
     else {
       sprayMetro.reset();
-      sprayMetro.interval(minutesToMillis(pumpFreq));
+      sprayMetro.interval(minutesToMillis(appSettings.pumpFrequency));
     }
     
   }
@@ -486,19 +456,19 @@ void topFan() {
   String msg;
   if (relayState.topFan  == LOW) {
     topFanMetro.reset();
-    topFanMetro.interval(minutesToMillis(fanTime));
+    topFanMetro.interval(minutesToMillis(appSettings.fanDuration));
     relayState.topFan = HIGH;
     msg="Starting Top Fan for ";
-    msg += fanTime;
+    msg += appSettings.fanDuration;
     msg += " minutes";
     Serial.println(msg);
     updateDisplay(msg);
   }
   else {
     topFanMetro.reset();
-    topFanMetro.interval(minutesToMillis(fanFreq));
+    topFanMetro.interval(minutesToMillis(appSettings.fanFrequency));
     msg = "Pausing Top Fan for";
-    msg += fanFreq;
+    msg += appSettings.fanFrequency;
     msg += " minutes";
     relayState.topFan = LOW;
     Serial.println(msg);
@@ -513,7 +483,7 @@ void timedEvents(String curTime) {
   Serial.print("current Time : ");
   Serial.println(cda.dateTime("H:i"));
 
-  if (curTime == light1On) {
+  if (curTime == appSettings.light1_On) {
     updateDisplay("Turn Light1 ON");
     Serial.println("Turn Light1 ON");
     switchLight1(HIGH);
@@ -521,7 +491,7 @@ void timedEvents(String curTime) {
     
     topFan();
   }
-  else if (curTime == light2On) {
+  else if (curTime == appSettings.light2_On) {
     updateDisplay("Turn Light2 ON");
     Serial.println("Turn Light2 ON");
     switchLight2(HIGH);
@@ -530,7 +500,7 @@ void timedEvents(String curTime) {
     sprayMetro.interval(secondsToMillis(10));    //pump will run 10 seconds after light are turned on
 
   }
-  else if (curTime == light1Off) {
+  else if (curTime == appSettings.light1_Off) {
     updateDisplay("Turn Light1 Off");
     Serial.println("Turn Light1 Off & Night Light On");
     switchLight1(LOW);
@@ -544,7 +514,7 @@ void timedEvents(String curTime) {
     sprayMetro.reset();
     sprayMetro.interval(hoursToMillis(23));         // stops pumpEvents for the night
   }
-  else if (curTime == light2Off) {
+  else if (curTime == appSettings.light2_Off) {
     updateDisplay("Turn Light2 Off");
     Serial.println("Turn Light2 Off");
     switchLight2(LOW);

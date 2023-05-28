@@ -1,3 +1,25 @@
+
+
+
+void Init_WebServer() {
+   // ******************************  Initialize Web Server and web events ******************************
+  server.on("/", handle_OnConnect);
+  server.on("/light1on", handle_light1on);
+  server.on("/light1off", handle_light1off);
+  server.on("/light2on", handle_light2on);
+  server.on("/light2off", handle_light2off);
+ // server.on("/nightlighton",handle_nightlighton);
+ // server.on("/nightlightoff",handle_nightlightoff);
+  server.on("/FillRO", handle_FillRO);
+  server.on("/SetTimes",handle_SetTimes);
+  server.on("/settings",handle_settings);
+  server.on("/pumpOn",handle_pumpOn);
+  server.on("/pumpOff", handle_pumpOff);
+  server.on("/topfan", handle_topFan);
+  server.begin();
+  Serial.println("HTTP server started");
+}
+
 void checkhttpclient() {
 
     server.handleClient();
@@ -82,14 +104,14 @@ void handle_FillRO() {
 }
 
 void handle_SetTimes() {
-    light1On = server.arg("light1start");
-    light1Off = server.arg("light1stop");
-    light2On = server.arg("light2start");
-    light2Off = server.arg("light2stop");
+    appSettings.light1_On = server.arg("light1start");
+    appSettings.light1_Off = server.arg("light1stop");
+    appSettings.light2_On = server.arg("light2start");
+    appSettings.light2_Off = server.arg("light2stop");
     //nightLightOn = server.arg("nlightstart");
     //nightLightOff = server.arg("nlightstop");
-    pumpFreq = server.arg("pumpfreq").toInt();
-    pumpTime = server.arg("pumplen").toInt();
+    appSettings.pumpFrequency = server.arg("pumpfreq").toInt();
+    appSettings.pumpDuration = server.arg("pumplen").toInt();
     server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
 }
 
@@ -110,7 +132,7 @@ void handle_pumpOff() {
 }
 
 void handle_settings() {
-    server.send(200, "text/html", sendSettingsHTML( pumpFreq, pumpTime, fanTime, fanFreq, light1On, light1Off, light2On, light2Off));
+    server.send(200, "text/html", sendSettingsHTML(appSettings));
 }
 
 void handle_topFan() {

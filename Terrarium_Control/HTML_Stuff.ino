@@ -75,7 +75,7 @@ String sendMainHTML(struct relayState_t relSt, uint8_t mfillTime, float temp, fl
   return ptr;
 }
 
-String sendSettingsHTML(uint8_t pumpfreq, uint8_t pumpLen, uint8_t fanLen, uint8_t fanfreq, String l1start, String l1stop, String l2start, String l2stop) {
+String sendSettingsHTML(struct settings_t mySettings) {
   String ptr = "<!DOCTYPE html> <html>\n";
   ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
   ptr += "<title>App Settings</title>\n";
@@ -94,33 +94,33 @@ String sendSettingsHTML(uint8_t pumpfreq, uint8_t pumpLen, uint8_t fanLen, uint8
   ptr += "<form action=/SetTimes>";
   ptr += "<label for=fname>Pump frequency (minutes)</label><br>";
   ptr += "<input type=number id=pumpfreq name=pumpfreq value=";
-  ptr += pumpfreq;
+  ptr += mySettings.pumpFrequency;
   ptr += "><br><br>";
   ptr += "<label for=fname>Pump Duration (seconds)</label><br>";
   ptr += "<input type=number id=pumplen name=pumplen value=";
-  ptr += pumpLen;
+  ptr += mySettings.pumpDuration;
   ptr += "><br><br>";
   ptr += "<label for=fname>Fan frequency (minutes)</label><br>";
   ptr += "<input type=number id=fanfreq name=fanfreq value=";
-  ptr += fanfreq;
+  ptr += mySettings.fanFrequency;
   ptr += "><br><br>";
   ptr += "<label for=fname>Fan Duration (minutes)</label><br>";
   ptr += "<input type=number id=fanLen name=fanLen value=";
-  ptr += fanLen;
+  ptr += mySettings.fanDuration;
   ptr += "><br><br>";
   ptr += "<label for=fname>Light 1 Start / Stop Time</label><br>";
   ptr += "<input type=Time id=light1start name=light1start value=";
-  ptr += l1start;
+  ptr += mySettings.light1_On;
   ptr += ">";
   ptr += "<input type=Time id=light1stop name=light1stop value=";
-  ptr += l1stop;
+  ptr += mySettings.light1_Off;
   ptr += "><br><br>";
   ptr += "<label for=fname>Light 2 Start / Stop Time</label><br>";
   ptr += "<input type=Time id=light2start name=light2start value=";
-  ptr += l2start;
+  ptr += mySettings.light2_On;
   ptr += ">";
   ptr += "<input type=Time id=light2stop name=light2stop value=";
-  ptr += l2stop;
+  ptr += mySettings.light2_Off;
   ptr += "><br><br>";
   /*ptr += "<label for=fname>Night Light Start / Stop Time</label><br>";
   ptr += "<input type=Time id=nlightstart name=nlightstart value=";
