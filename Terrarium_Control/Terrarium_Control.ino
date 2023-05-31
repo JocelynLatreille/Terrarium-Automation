@@ -1,5 +1,5 @@
 #include <ESP8266WebServer.h>
-
+#include <Espalexa.h>
 #include <SHT31.h>
 #include <ezTime.h>
 #include <Wire.h>
@@ -29,6 +29,7 @@ String appVers ="Version 1.7.9-a";
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 ESP8266WebServer server(80);
+Espalexa espalexa;
 
 //**********************  Temperature Sensor variables  ***************
 SHT31 sht;
@@ -124,8 +125,8 @@ void setup() {
   display.display();
 
   start_Wifi();
-    
-  addAlexaDevices();
+  Init_WebServer();  
+  //addAlexaDevices();
   
   waitForSync();
   
@@ -215,7 +216,7 @@ void splashScreen() {
 
 void loop() {
   static String lastTime;         //Prevents calling the same Timed event twice
-  
+  espalexa.loop();
   if (displayMetro.check() ==1 ) {
      updateDisplay("");       //Update LCD display with alternating info
   }
