@@ -9,7 +9,7 @@
 #include <Metro.h>
 
 
-String appVers ="Version 1.7.9-a";
+String appVers ="Version 1.7.9.2";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4    
@@ -126,7 +126,7 @@ void setup() {
 
   start_Wifi();
   Init_WebServer();  
-  //addAlexaDevices();
+  addAlexaDevices();
   
   waitForSync();
   

@@ -16,6 +16,12 @@ void Init_WebServer() {
   server.on("/pumpOn",handle_pumpOn);
   server.on("/pumpOff", handle_pumpOff);
   server.on("/topfan", handle_topFan);
+  server.onNotFound([](){
+	if (!espalexa.handleAlexaApiCall(server.uri(),server.arg(0)))
+	{
+		server.send(404, "text/plain", "Not found");
+	}
+});
   server.begin();
   Serial.println("HTTP server started");
 }

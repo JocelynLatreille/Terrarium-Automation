@@ -29,6 +29,6 @@ void pumpChange(uint8_t OnOff)
 void addAlexaDevices() {
   espalexa.addDevice("Lumieres Terrarium",lightChange);
   espalexa.addDevice("Pompe Terrarium",pumpChange);
-  espalexa.begin();
+  espalexa.begin(&server);
 }
 //*************************************************************************
