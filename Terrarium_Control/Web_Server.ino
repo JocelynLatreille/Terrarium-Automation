@@ -8,9 +8,6 @@ void Init_WebServer() {
   server.on("/light1off", handle_light1off);
   server.on("/light2on", handle_light2on);
   server.on("/light2off", handle_light2off);
- // server.on("/nightlighton",handle_nightlighton);
- // server.on("/nightlightoff",handle_nightlightoff);
-  server.on("/FillRO", handle_FillRO);
   server.on("/SetTimes",handle_SetTimes);
   server.on("/settings",handle_settings);
   server.on("/pumpOn",handle_pumpOn);
@@ -40,14 +37,14 @@ void handle_OnConnect() {
     //LED1status = LOW;
     //LED2status = LOW;
 
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
+    server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));
 }
 void handle_light1on() {
     //LED1status = HIGH;
     Serial.println("Light1 Status: ON");
     updateDisplay("Manually turning Light 1 ON");
     switchLight1(HIGH);
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
+    server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));
 }
 
 void handle_light1off() {
@@ -55,7 +52,7 @@ void handle_light1off() {
     Serial.println("Light1 Status: OFF");
     updateDisplay("Manually turning Light 1 OFF");
     switchLight1(LOW);
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
+    server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));
 }
 
 void handle_light2on() {
@@ -63,7 +60,7 @@ void handle_light2on() {
     Serial.println("Light2 Status: ON");
     updateDisplay("Manually turning Light 2 ON");
     switchLight2(HIGH);
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
+    server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));
 }
 
 void handle_light2off() {
@@ -71,42 +68,11 @@ void handle_light2off() {
     Serial.println("Light2 Status: OFF");
     updateDisplay("Manually turning Light 2 OFF");
     switchLight2(LOW);
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
+    server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));
 }
-/*
-void handle_nightlightoff() {
-  Serial.println("Night Light Status: OFF");
-  updateDisplay("Manually turning OFF Night Light");
-  switchNightLight(LOW);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState,  manfillTime,GetTemp(),pumpState));
-}
-
-void handle_nightlighton() {
-  Serial.println("Night Light Status: ON");
-  updateDisplay("Manually turning ON Night Light");
-  switchNightLight(HIGH);
-  server.send(200, "text/html", sendMainHTML(light1RelayState, light2RelayState, nightLightRelayState, roRelayState, manfillTime,GetTemp(),pumpState));
-}
-*/
 
 void handle_NotFound() {
     server.send(404, "text/plain", "Not found");
-}
-
-void handle_FillRO() {
-
-
-    manfillTime = server.arg("filltime").toInt();
-    Serial.println(manfillTime);
-    String msg = "Manually Filling RO for ";
-    msg += manfillTime;
-    msg += " minutes";
-    updateDisplay(msg);
-    Serial.println(msg);
-    manualFill(manfillTime);
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
-
-
 }
 
 void handle_SetTimes() {
@@ -114,11 +80,9 @@ void handle_SetTimes() {
     appSettings.light1_Off = server.arg("light1stop");
     appSettings.light2_On = server.arg("light2start");
     appSettings.light2_Off = server.arg("light2stop");
-    //nightLightOn = server.arg("nlightstart");
-    //nightLightOff = server.arg("nlightstop");
     appSettings.pumpFrequency = server.arg("pumpfreq").toInt();
     appSettings.pumpDuration = server.arg("pumplen").toInt();
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
+    server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));
 }
 
 void handle_pumpOn() {
@@ -126,7 +90,7 @@ void handle_pumpOn() {
     Serial.println("Manually Pumping");
     //digitalWrite(pumpPin, pumpState);
     spray();
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
+    server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));
 }
 
 void handle_pumpOff() {
@@ -134,7 +98,7 @@ void handle_pumpOff() {
     Serial.println("Manually Stoping Pump");
     //digitalWrite(pumpPin, pumpState);
     spray();
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
+    server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));
 }
 
 void handle_settings() {
@@ -143,5 +107,5 @@ void handle_settings() {
 
 void handle_topFan() {
     topFan();
-    server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));
+    server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));
 }

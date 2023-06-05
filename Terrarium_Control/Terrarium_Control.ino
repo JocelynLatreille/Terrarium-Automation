@@ -9,7 +9,7 @@
 #include <Metro.h>
 
 
-String appVers ="Version 1.7.9";
+String appVers ="Version 1.8.0.a";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4    
@@ -42,7 +42,6 @@ Metro displayMetro ;
 //Metro fanMetro ;
 Metro checkCurTime ;      // Event to check the current time and act on any timed event
 Metro topFanMetro ;       // Top fan to remove water from front glass
-Metro manualFillMetro;    //RO water manual fill
 //****************************************************
 struct relayState_t {
   int pump;
@@ -63,9 +62,7 @@ struct settings_t {
   String light2_Off;
 } appSettings;
 
-uint8_t manfillTime = 20;   //Nuber of minutes to manually fill RO bottles
 uint8_t fullRO;                //Level of RO supply
-bool manFilling = false;
 
 void Init_AppValues() {
 
@@ -117,7 +114,6 @@ void setup() {
   sprayMetro.interval(hoursToMillis(20));        //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
   topFanMetro.interval(hoursToMillis(20));      //Set to a ridiculously long delay . Startup and Timed events will take care of the rest
   checkCurTime.interval(secondsToMillis(timeCheckInterval));   //Check current time for any sceduled events
-  manualFillMetro.interval(hoursToMillis(20));        //Set to a ridiculously long delay .
   displayMetro.interval(secondsToMillis(displayRefreshInterval));
   display.clearDisplay();
   display.setCursor(0,0);
@@ -139,27 +135,13 @@ void setup() {
   Serial.println(cda.dateTime());             //Prints datetime
   Serial.println(cda.dateTime("H:i"));        //Prints Time in HH:MM format . This is how we will compare timed events
   startup();
- 
-
   
-  manFilling = false;
 }
 
 void startup() {
   // This sub is called once during setup, to initialize anything based on the schedule after power up
   Serial.println("Initializing after power On");
-  /*
-    Serial.print("CDA Hour:");
-    Serial.print(cda.hour());
-    Serial.print("CDA Minute:");
-    Serial.print(cda.minute());
-    Serial.print("     ");
-    Serial.print("Light1Hour:");
-    Serial.print(light1On.substring(0, 2));
-    Serial.print("   ");
-    Serial.print("Light1 Minute:");
-    Serial.println(light1On.substring(3, 5));
-  */
+  
   if (cda.hour() >= appSettings.light1_On.substring(0, 2).toInt() && cda.hour() < appSettings.light1_Off.substring(0, 2).toInt()) {
 
     Serial.println("Turning Light1 On");
@@ -177,15 +159,7 @@ void startup() {
 
 
   }
- /*
-  if ((cda.hour() >= nightLightOn.substring(0, 2).toInt()) && (cda.hour() <= nightLightOff.substring(0, 2).toInt())) {
-
-    Serial.println("Turning Night Light On");
-  //  digitalWrite(nightLightPin, HIGH);    // Turning night Light  ON
-    nightLightRelayState=HIGH;
-
-  }
-  */
+ 
   else {
     //Nothing for now
 
@@ -217,6 +191,8 @@ void splashScreen() {
 void loop() {
   static String lastTime;         //Prevents calling the same Timed event twice
   espalexa.loop();
+  checkRO();
+
   if (displayMetro.check() ==1 ) {
      updateDisplay("");       //Update LCD display with alternating info
   }
@@ -238,15 +214,7 @@ void loop() {
     topFan();
   }
 
-  if ((manFilling == true) && (manualFillMetro.check() == 1) && (relayState.ro == HIGH)) {
-    Serial.println("Manual Filling Timed event");
-    stopRO();
-    manFilling=false;
-  }
-  else if (manFilling == false) {
-    //Serial.println("Checking RO");
-    checkRO();
-  }
+
   sht.read();
   checkhttpclient();
   
@@ -281,7 +249,7 @@ void spray() {
     
   }
   digitalWrite(pumpPin, relayState.pump);
-  server.send(200, "text/html", sendMainHTML(relayState, manfillTime, GetTemp(),GetHumidity()));    // If a Web client is connected, refresh the page to update the button state
+  server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));    // If a Web client is connected, refresh the page to update the button state
  
 }
 
@@ -294,7 +262,7 @@ void stopRO() {
 }
 
 void checkRO() {
-  if (manFilling == false) {           //Only check Float switch if not manually filling
+  
   static unsigned long t;
   fullRO = digitalRead(fullROpin);
   //Serial.print("Full RO = ");
@@ -327,34 +295,7 @@ void checkRO() {
     else {
       //Serial.println("RO Is full");
     }
-  
-  
-  }
-  else {
-    Serial.println("Manually filling.... ");
-  }
- 
- 
-}
-
-void manualFill(uint8_t T) {
-  Serial.println("Manual Fill called");
-  if (relayState.ro == LOW) {
-      manualFillMetro.reset();
-      manualFillMetro.interval(minutesToMillis(T));
-      digitalWrite(roPin, HIGH);
-      relayState.ro = HIGH;
-      manFilling = true;
-      
-    
-  }
- else {
-      stopRO();
-      manFilling=false;
-      manualFillMetro.reset();
-      manualFillMetro.interval(hoursToMillis(24));
-      
- }
+   
 }
 
 void switchLight1(uint8_t state) {
@@ -437,20 +378,7 @@ void updateDisplay(String msg) {
     
    }
    display.display();
-   /*
-   time_t tnow = time(nullptr);
-  //Serial.println();
-   display.clearDisplay();
-  
    
-   display.print("Temperature : ");
-   
-   display.println(msg);
-   
-   //display.startscrollright(0x02, 0x02);
-   Serial.print("Last NTP Update : ");
-   Serial.println(lastNtpUpdateTime());
-   */
 }
 
 void topFan() {
@@ -522,16 +450,7 @@ void timedEvents(String curTime) {
     Serial.println("Turn Light2 Off");
     switchLight2(LOW);
   }
-  /*      Night Lights stuff disabled due to V1.0 of PCB issues
-  else if (curTime == nightLightOn) {
-    Serial.println("Turn Night Light On");
-    switchNightLight(HIGH);
-  }
-  else if (curTime == nightLightOff) {
-    Serial.println("Turn Night Light Off");
-    switchNightLight(LOW);
-  }
-  */
+  
 }
 
 unsigned long secondsToMillis(unsigned long sec) {
