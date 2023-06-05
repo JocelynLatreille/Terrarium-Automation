@@ -267,13 +267,13 @@ void checkRO() {
   fullRO = digitalRead(fullROpin);
   //Serial.print("Full RO = ");
   //Serial.println(fullRO);
-  if ((relayState.ro == LOW) && (fullRO == HIGH) && (t==0)) {
+  if ((relayState.ro == LOW) && (fullRO == LOW) && (t==0)) {
     Serial.println("Not filling , Not Full");
-       if (t==0){
-          t=millis();
-       }
+
+      t=millis();  //Start timer to debounce switch
+       
     }
-   else if ((relayState.ro == LOW) && (fullRO == HIGH) &&((millis()-t)>3000)) {              //Debounce switch 
+   else if ((relayState.ro == LOW) && (fullRO == LOW) &&((millis()-t)>3000)) {              //Debounce switch 
     Serial.println((millis()-t));
     Serial.print("Ro Relay State :");
     Serial.println(relayState.ro);
@@ -284,7 +284,7 @@ void checkRO() {
     digitalWrite(roPin, relayState.ro);
     
     }
-   else if ((relayState.ro == HIGH) && (fullRO == LOW)) {
+   else if ((relayState.ro == HIGH) && (fullRO == HIGH)) {
     Serial.println("Filling , Full");
     Serial.println("Stop filling....");
     updateDisplay("Stop filling RO");
