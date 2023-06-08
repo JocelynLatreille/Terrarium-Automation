@@ -9,7 +9,7 @@
 #include <Metro.h>
 
 
-String appVers ="Version 1.8.0.a";
+String appVers ="Version 1.8.0";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4    
