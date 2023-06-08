@@ -1,7 +1,7 @@
 
 
 
-String sendMainHTML(struct relayState_t relSt, uint8_t mfillTime, float temp, float Humidity) {
+String sendMainHTML(struct relayState_t relSt, float temp, float Humidity) {
   String ptr = "<!DOCTYPE html> <html>\n";
   ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
   ptr += "<title>Terrarium Control</title>\n";
@@ -40,33 +40,12 @@ String sendMainHTML(struct relayState_t relSt, uint8_t mfillTime, float temp, fl
   } else {
     ptr += "<p>Top Fan Status: OFF</p><a class=\"button button-on\" href=\"/topfan\">ON</a>\n";
   }
-  /*
-    if (nitelitestat)
-    {
-      ptr += "<p>Night Light Status: ON</p><a class=\"button button-off\" href=\"/nightlightoff\">OFF</a>\n";
-    }
-    else
-    {
-      ptr += "<p>Night Light Status: OFF</p><a class=\"button button-on\" href=\"/nightlighton\">ON</a>\n";
-    }
-    */
+  
   if (relSt.pump == LOW) {
     ptr += "<p>Water Misting</p><a class=\"button button-on\" href=\"/pumpOn\">Start</a>\n";
   } else {
     ptr += "<p>Water Misting</p><a class=\"button button-off\" href=\"/pumpOff\">Stop</a>\n";
   }
-
-  ptr += "<form action=/FillRO>";
-  ptr += "<label for=fname>Number of minutes to fill</label><br>";
-  ptr += "<input type=number id=filltime name=filltime value=";
-  ptr += mfillTime;
-  ptr += "><br>";
-  if (relSt.ro == LOW) {
-    ptr += "<input type=submit value=Fill><br><br>";
-  } else {
-    ptr += "<input type=submit value=Stop><br><br>";
-  }
-  ptr += "</form> ";
 
   //ptr += "<p>Application Settings</p><a class=\"button button-on\" href=\"/settings\">Settings</a>\n";
   ptr += "<a href=/settings>Settings</a>";
@@ -122,14 +101,7 @@ String sendSettingsHTML(struct settings_t mySettings) {
   ptr += "<input type=Time id=light2stop name=light2stop value=";
   ptr += mySettings.light2_Off;
   ptr += "><br><br>";
-  /*ptr += "<label for=fname>Night Light Start / Stop Time</label><br>";
-  ptr += "<input type=Time id=nlightstart name=nlightstart value=";
-  ptr += nlstart;
-  ptr += ">";
-  ptr += "<input type=Time id=nlightstop name=nlightstop value=";
-  ptr += nlstop;
-  ptr += "><br><br>";
-  */
+  
   ptr += "<input type=submit value=Save>";
   ptr += "</form> ";
 
