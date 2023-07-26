@@ -71,7 +71,7 @@ String sendSettingsHTML(struct settings_t mySettings) {
   ptr += "<body>\n";
   ptr += "<h1>Terrarium Control Settings</h1>";
   ptr += "<form action=/SetTimes>";
-  ptr += "<label for=fname>Pump frequency (minutes)</label><br>";
+  ptr += "<label for=fname>Pump Frequency (minutes)</label><br>";
   ptr += "<input type=number id=pumpfreq name=pumpfreq value=";
   ptr += mySettings.pumpFrequency;
   ptr += "><br><br>";

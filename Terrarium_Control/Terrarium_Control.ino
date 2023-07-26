@@ -52,7 +52,7 @@ struct relayState_t {
 } relayState;
 
 struct settings_t {
-  uint8_t pumpFrequency;          //Pump frequency in minutes
+  uint16_t pumpFrequency;          //Pump frequency in minutes
   uint8_t pumpDuration;           //Number of seconds to run the pump
   uint8_t fanDuration;            //Number of minutes to run the fan
   uint8_t fanFrequency;           //Fan frequency in minutes
