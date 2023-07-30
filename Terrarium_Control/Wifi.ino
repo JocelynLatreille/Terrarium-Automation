@@ -1,4 +1,5 @@
 #include <ESP8266WiFi.h>
+#include <ArduinoOTA.h>
 
 //*******************  Wi-Fi info ************************
 char ssid[] = "Whipet 2.4";
@@ -14,6 +15,7 @@ IPAddress subnet(255, 255, 255, 0);
 
 void start_Wifi() {
     //connect to your local wi-fi network
+    WiFi.mode(WIFI_AP_STA);
     WiFi.hostname("Dendrobates");
     WiFi.begin(ssid, password);
     Serial.println("Connecting to ");
@@ -28,6 +30,9 @@ void start_Wifi() {
         display.print(".");
         display.display();
     }
+
+    //Start OTA Monitor
+    ArduinoOTA.begin();
     display.clearDisplay();
     display.setCursor(0,0);
     Serial.println("");
@@ -42,3 +47,7 @@ void start_Wifi() {
     delay(3000);
 }
 
+ 
+void checkArduino_OTA() {
+  ArduinoOTA.handle();
+}
