@@ -191,6 +191,7 @@ void splashScreen() {
 void loop() {
   static String lastTime;         //Prevents calling the same Timed event twice
   espalexa.loop();
+  checkArduino_OTA();
   checkRO();
 
   if (displayMetro.check() ==1 ) {
