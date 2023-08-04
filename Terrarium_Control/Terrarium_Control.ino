@@ -1,3 +1,7 @@
+#include <Arduino_JSON.h>
+
+#include <LittleFS.h>
+
 #include <ESP8266WebServer.h>
 #include <Espalexa.h>
 #include <SHT31.h>
@@ -10,6 +14,7 @@
 
 
 String appVers ="Version 1.8.0";
+String sConfigFile = "/Config.json";
 // *******************************  All these will need to be changed for the esp8266 pins ********************************
 #define light1Pin D0                    //Relay 1 
 #define light2Pin D3                    //Relay 4    
@@ -65,7 +70,11 @@ struct settings_t {
 uint8_t fullRO;                //Level of RO supply
 
 void Init_AppValues() {
-
+    File myFile = LittleFS.open(sConfigFile,"r");
+  if(!myFile){
+    Serial.println("No Saved Data");
+    
+    //Creating default values and save in filesystem
     appSettings.light1_On = "08:00";
     appSettings.light1_Off = "20:55";
     appSettings.light2_On = "08:10";
@@ -74,12 +83,44 @@ void Init_AppValues() {
     appSettings.pumpDuration = 10;
     appSettings.fanFrequency = 45;
     appSettings.fanDuration = 10;
+        
+  }
+  else {
+    Serial.println("File Exist");     //Config file exists. Read values into appSettings
+    JSONVar mySettings = JSON.parse(myFile.readString());
+    appSettings.light1_On = (String) mySettings["light1_On"];
+    appSettings.light1_Off = (String) mySettings["light1_Off"];
+    appSettings.light2_On = (String) mySettings["light2_On"];
+    appSettings.light2_Off = (String) mySettings["light2_Off"];
+    appSettings.pumpFrequency = mySettings["pumpFrequency"];
+    appSettings.pumpDuration = mySettings["pumpDuration"];
+    appSettings.fanFrequency = mySettings["fanFrequency"];
+    appSettings.fanDuration = mySettings["fanDuration"];
+    saveSettings();
+  }
+    myFile.close();
+}
+
+void saveSettings() {
+  JSONVar mySettings;
+  mySettings["light1_On"] = appSettings.light1_On;
+  mySettings["light2_On"] = appSettings.light2_On;
+  mySettings["light1_Off"] = appSettings.light1_Off;
+  mySettings["light2_Off"] = appSettings.light2_Off;
+  mySettings["pumpFrequency"] = appSettings.pumpFrequency;
+  mySettings["pumpDuration"] = appSettings.pumpDuration;
+  mySettings["fanFrequency"] = appSettings.fanFrequency;
+  mySettings["fanDuration"] = appSettings.fanDuration;
+  File myFile = LittleFS.open(sConfigFile,"w");
+  myFile.print(JSON.stringify(mySettings));
+  myFile.close();
 }
 
 void setup() {
     
   Serial.begin(115200);
   while (!Serial);
+  LittleFS.begin();
   Init_AppValues();
   
 

@@ -82,7 +82,11 @@ void handle_SetTimes() {
     appSettings.light2_Off = server.arg("light2stop");
     appSettings.pumpFrequency = server.arg("pumpfreq").toInt();
     appSettings.pumpDuration = server.arg("pumplen").toInt();
+    appSettings.fanFrequency = server.arg("fanfreq").toInt();
+    appSettings.fanDuration = server.arg("fanLen").toInt();
+    saveSettings();
     server.send(200, "text/html", sendMainHTML(relayState, GetTemp(),GetHumidity()));
+
 }
 
 void handle_pumpOn() {
