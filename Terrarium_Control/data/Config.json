@@ -1,0 +1,4 @@
+{
+  "light1_On": "08:00", "light1_Off": "20:55","light2_On": "08:10","light2_Off": "21:00","pumpFrequency":180,"pumpDuration":10,
+  "fanFrequency":45,"fanDuration":10
+}
